@@ -15,7 +15,14 @@
 package main
 
 import (
+	"github.com/gevinzone/basic-go/week2/webook/internal/repository"
+	"github.com/gevinzone/basic-go/week2/webook/internal/repository/dao"
+	"github.com/gevinzone/basic-go/week2/webook/internal/service"
+	"github.com/gevinzone/basic-go/week2/webook/internal/web"
+	"github.com/gevinzone/basic-go/week2/webook/internal/web/middleware"
 	"github.com/gin-contrib/cors"
+	"github.com/gin-contrib/sessions"
+	"github.com/gin-contrib/sessions/cookie"
 	"github.com/gin-gonic/gin"
 	"gorm.io/driver/mysql"
 	"gorm.io/gorm"
@@ -24,7 +31,10 @@ import (
 )
 
 func main() {
+	db := initDB()
 	server := initWebServer()
+	u := initUserHandler(db)
+	u.RegisterRoutes(server)
 	err := server.Run(":8000")
 	if err != nil {
 		panic(err)
@@ -52,7 +62,18 @@ func initWebServer() *gin.Engine {
 		},
 		MaxAge: 12 * time.Hour,
 	}))
+
+	server.Use(sessions.Sessions("gevin_session", cookie.NewStore([]byte("this is secret"))))
+	server.Use(middleware.NewLoginMiddlewareBuilder().
+		IgnorePaths("/users/signup", "/users/login").
+		Build())
 	return server
+}
+
+func initUserHandler(db *gorm.DB) *web.UserHandler {
+	return web.NewUserHandler(
+		service.NewUserService(
+			repository.NewUserRepository(dao.NewUserDAO(db))))
 }
 
 func initDB() *gorm.DB {
@@ -61,5 +82,9 @@ func initDB() *gorm.DB {
 		panic(err)
 	}
 
+	err = dao.InitTable(db)
+	if err != nil {
+		panic(err)
+	}
 	return db
 }
