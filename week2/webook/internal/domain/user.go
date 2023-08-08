@@ -24,3 +24,13 @@ type User struct {
 	Password string
 	Ctime    time.Time
 }
+
+type Profile struct {
+	UserId   int64
+	Email    string
+	Nickname string
+	Biology  string
+	Birthday time.Time
+	Ctime    time.Time
+	Utime    time.Time
+}

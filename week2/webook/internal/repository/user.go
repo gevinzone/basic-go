@@ -18,6 +18,8 @@ import (
 	"context"
 	"github.com/gevinzone/basic-go/week2/webook/internal/domain"
 	"github.com/gevinzone/basic-go/week2/webook/internal/repository/dao"
+	"gorm.io/gorm"
+	"time"
 )
 
 var (
@@ -26,17 +28,21 @@ var (
 )
 
 type UserRepository struct {
-	dao *dao.UserDAO
+	db         *gorm.DB
+	userDAO    *dao.UserDAO
+	profileDAO *dao.ProfileDAO
 }
 
-func NewUserRepository(dao *dao.UserDAO) *UserRepository {
+func NewUserRepository(db *gorm.DB) *UserRepository {
 	return &UserRepository{
-		dao: dao,
+		db:         db,
+		userDAO:    dao.NewUserDAO(db),
+		profileDAO: dao.NewProfileDAO(db),
 	}
 }
 
 func (r *UserRepository) FindByEmail(ctx context.Context, email string) (domain.User, error) {
-	u, err := r.dao.FindByEmail(ctx, email)
+	u, err := r.userDAO.FindByEmail(ctx, email)
 	if err != nil {
 		var user domain.User
 		return user, err
@@ -49,9 +55,22 @@ func (r *UserRepository) FindByEmail(ctx context.Context, email string) (domain.
 }
 
 func (r *UserRepository) Create(ctx context.Context, u domain.User) error {
-	return r.dao.Insert(ctx, dao.User{
-		Email:    u.Email,
-		Password: u.Password,
+	return r.db.Transaction(func(tx *gorm.DB) error {
+		var (
+			user dao.User
+			err  error
+		)
+		userDAO := dao.NewUserDAO(tx)
+		if user, err = userDAO.Insert(ctx, dao.User{
+			Email:    u.Email,
+			Password: u.Password,
+		}); err != nil {
+			return err
+		}
+
+		profileDAO := dao.NewProfileDAO(tx)
+		err = profileDAO.Insert(ctx, dao.Profile{UserId: user.Id, Birthday: time.Now()})
+		return err
 	})
 }
 
@@ -59,4 +78,35 @@ func (r *UserRepository) FindById(int64) {
 	// 先从 cache 里面找
 	// 再从 dao 里面找
 	// 找到了回写 cache
+}
+
+func (r *UserRepository) FindProfileByEmail(ctx context.Context, email string) (domain.Profile, error) {
+	var (
+		profile domain.Profile
+		err     error
+	)
+	err = r.db.Transaction(func(tx *gorm.DB) error {
+		var (
+			u  dao.User
+			p  dao.Profile
+			er error
+		)
+		if u, er = r.userDAO.FindByEmail(ctx, email); er != nil {
+			return er
+		}
+		if p, er = r.profileDAO.FindByUserId(ctx, u.Id); er != nil {
+			return er
+		}
+		profile = domain.Profile{
+			UserId:   u.Id,
+			Email:    u.Email,
+			Nickname: p.Nickname,
+			Biology:  p.Biology,
+			Birthday: p.Birthday,
+			Ctime:    time.UnixMilli(p.Ctime),
+			Utime:    time.UnixMilli(p.Utime),
+		}
+		return nil
+	})
+	return profile, err
 }

@@ -41,7 +41,7 @@ func (dao *UserDAO) FindByEmail(ctx context.Context, email string) (User, error)
 	return u, err
 }
 
-func (dao *UserDAO) Insert(ctx context.Context, u User) error {
+func (dao *UserDAO) Insert(ctx context.Context, u User) (User, error) {
 	now := time.Now().UnixMilli()
 	u.Ctime = now
 	u.Utime = now
@@ -50,10 +50,32 @@ func (dao *UserDAO) Insert(ctx context.Context, u User) error {
 		const uniqueConflictsErrNo uint16 = 1062
 		if mysqlErr.Number == uniqueConflictsErrNo {
 			// 邮箱冲突
-			return ErrUserDuplicateEmail
+			return u, ErrUserDuplicateEmail
 		}
 	}
-	return err
+	return u, err
+}
+
+type ProfileDAO struct {
+	db *gorm.DB
+}
+
+func NewProfileDAO(db *gorm.DB) *ProfileDAO {
+	return &ProfileDAO{db: db}
+}
+
+func (dao *ProfileDAO) FindByUserId(ctx context.Context, id int64) (Profile, error) {
+	var p Profile
+	err := dao.db.WithContext(ctx).Where("user_id=?", id).First(&p).Error
+	return p, err
+}
+
+func (dao *ProfileDAO) Insert(ctx context.Context, p Profile) error {
+	return dao.db.WithContext(ctx).Create(&p).Error
+}
+
+func (dao *ProfileDAO) Update(ctx context.Context, p Profile) error {
+	return dao.db.WithContext(ctx).Model(&p).Updates(p).Error
 }
 
 // User 直接对应数据库表结构
@@ -62,6 +84,16 @@ type User struct {
 	Id       int64  `gorm:"primaryKey, autoIncrement"`
 	Email    string `gorm:"unique"`
 	Password string
+	Ctime    int64
+	Utime    int64
+}
+
+type Profile struct {
+	Id       int64 `gorm:"primaryKey, autoIncrement"`
+	UserId   int64
+	Nickname string
+	Biology  string
+	Birthday time.Time
 	Ctime    int64
 	Utime    int64
 }

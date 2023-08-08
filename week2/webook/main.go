@@ -73,7 +73,7 @@ func initWebServer() *gin.Engine {
 func initUserHandler(db *gorm.DB) *web.UserHandler {
 	return web.NewUserHandler(
 		service.NewUserService(
-			repository.NewUserRepository(dao.NewUserDAO(db))))
+			repository.NewUserRepository(db)))
 }
 
 func initDB() *gorm.DB {
