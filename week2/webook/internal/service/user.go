@@ -59,3 +59,11 @@ func (svc *UserService) SignUp(ctx context.Context, u domain.User) error {
 	u.Password = string(hash)
 	return svc.repo.Create(ctx, u)
 }
+
+func (svc *UserService) EditProfile(ctx context.Context, p domain.Profile) error {
+	return svc.repo.UpdateProfile(ctx, p)
+}
+
+func (svc *UserService) GetProfileByEmail(ctx context.Context, email string) (domain.Profile, error) {
+	return svc.repo.FindProfileByEmail(ctx, email)
+}

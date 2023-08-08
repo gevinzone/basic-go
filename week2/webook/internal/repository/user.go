@@ -69,7 +69,7 @@ func (r *UserRepository) Create(ctx context.Context, u domain.User) error {
 		}
 
 		profileDAO := dao.NewProfileDAO(tx)
-		err = profileDAO.Insert(ctx, dao.Profile{UserId: user.Id, Birthday: time.Now()})
+		err = profileDAO.Insert(ctx, dao.Profile{UserId: user.Id, Birthday: time.Now().UnixMilli()})
 		return err
 	})
 }
@@ -91,10 +91,12 @@ func (r *UserRepository) FindProfileByEmail(ctx context.Context, email string) (
 			p  dao.Profile
 			er error
 		)
-		if u, er = r.userDAO.FindByEmail(ctx, email); er != nil {
+		userDAO := dao.NewUserDAO(tx)
+		profileDAO := dao.NewProfileDAO(tx)
+		if u, er = userDAO.FindByEmail(ctx, email); er != nil {
 			return er
 		}
-		if p, er = r.profileDAO.FindByUserId(ctx, u.Id); er != nil {
+		if p, er = profileDAO.FindByUserId(ctx, u.Id); er != nil {
 			return er
 		}
 		profile = domain.Profile{
@@ -102,11 +104,19 @@ func (r *UserRepository) FindProfileByEmail(ctx context.Context, email string) (
 			Email:    u.Email,
 			Nickname: p.Nickname,
 			Biology:  p.Biology,
-			Birthday: p.Birthday,
+			Birthday: time.UnixMilli(p.Birthday),
 			Ctime:    time.UnixMilli(p.Ctime),
 			Utime:    time.UnixMilli(p.Utime),
 		}
 		return nil
 	})
 	return profile, err
+}
+
+func (r *UserRepository) UpdateProfile(ctx context.Context, profile domain.Profile) error {
+	return r.profileDAO.Update(ctx, dao.Profile{
+		Birthday: profile.Birthday.UnixMilli(),
+		Biology:  profile.Biology,
+		Nickname: profile.Nickname,
+	})
 }

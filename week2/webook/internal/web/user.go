@@ -133,5 +133,15 @@ func (u *UserHandler) Edit(ctx *gin.Context) {
 }
 
 func (u *UserHandler) Profile(ctx *gin.Context) {
-	ctx.String(http.StatusOK, "这是你的 Profile")
+	email := ctx.Query("email")
+	if email == "" {
+		ctx.JSON(http.StatusBadRequest, map[string]string{"error": "url 缺少email 参数"})
+		return
+	}
+	profile, err := u.svc.GetProfileByEmail(ctx, email)
+	if err != nil {
+		ctx.JSON(http.StatusInternalServerError, "系统错误")
+		return
+	}
+	ctx.JSON(http.StatusOK, profile)
 }

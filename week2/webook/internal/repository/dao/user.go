@@ -71,10 +71,14 @@ func (dao *ProfileDAO) FindByUserId(ctx context.Context, id int64) (Profile, err
 }
 
 func (dao *ProfileDAO) Insert(ctx context.Context, p Profile) error {
+	now := time.Now().UnixMilli()
+	p.Ctime = now
+	p.Utime = now
 	return dao.db.WithContext(ctx).Create(&p).Error
 }
 
 func (dao *ProfileDAO) Update(ctx context.Context, p Profile) error {
+	p.Utime = time.Now().UnixMilli()
 	return dao.db.WithContext(ctx).Model(&p).Updates(p).Error
 }
 
@@ -93,7 +97,7 @@ type Profile struct {
 	UserId   int64
 	Nickname string
 	Biology  string
-	Birthday time.Time
+	Birthday int64
 	Ctime    int64
 	Utime    int64
 }
