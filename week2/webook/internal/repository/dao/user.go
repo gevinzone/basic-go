@@ -79,7 +79,7 @@ func (dao *ProfileDAO) Insert(ctx context.Context, p Profile) error {
 
 func (dao *ProfileDAO) Update(ctx context.Context, p Profile) error {
 	p.Utime = time.Now().UnixMilli()
-	return dao.db.WithContext(ctx).Model(&p).Updates(p).Error
+	return dao.db.WithContext(ctx).Model(&p).Where("user_id=?", p.UserId).Updates(p).Error
 }
 
 // User 直接对应数据库表结构

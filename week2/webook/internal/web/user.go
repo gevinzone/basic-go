@@ -22,6 +22,7 @@ import (
 	"github.com/gin-contrib/sessions"
 	"github.com/gin-gonic/gin"
 	"net/http"
+	"time"
 )
 
 type UserHandler struct {
@@ -49,6 +50,7 @@ func (u *UserHandler) RegisterRoutes(server *gin.Engine) {
 	ug.GET("/profile", u.Profile)
 	ug.POST("/signup", u.SignUp)
 	ug.POST("/login", u.Login)
+	ug.POST("/logout", u.Logout)
 	ug.POST("/edit", u.Edit)
 }
 
@@ -128,8 +130,56 @@ func (u *UserHandler) Login(ctx *gin.Context) {
 	ctx.String(http.StatusOK, "登录成功")
 }
 
-func (u *UserHandler) Edit(ctx *gin.Context) {
+func (u *UserHandler) Logout(ctx *gin.Context) {
 
+}
+
+func (u *UserHandler) Edit(ctx *gin.Context) {
+	type request struct {
+		UserId   int64  `json:"user_id"`
+		Nickname string `json:"nickname"`
+		Biology  string `json:"biology"`
+		Birthday string `json:"birthday"`
+	}
+
+	req := request{}
+	err := ctx.Bind(&req)
+	if err != nil {
+		ctx.String(http.StatusBadRequest, "输入数据格式不对")
+		return
+	}
+	p, err := func(r request) (domain.Profile, error) {
+		var p domain.Profile
+		if len([]rune(r.Nickname)) > 64 {
+			return p, errors.New("nickname 过长")
+		}
+		if len([]rune(r.Biology)) > 256 {
+			return p, errors.New("biology 过长")
+		}
+		t, er := time.Parse("2006-01-02", r.Birthday)
+		if er != nil {
+			return p, er
+		}
+		p = domain.Profile{
+			UserId:   r.UserId,
+			Nickname: r.Nickname,
+			Biology:  r.Biology,
+			Birthday: t,
+		}
+
+		return p, nil
+	}(req)
+	if err != nil {
+		ctx.String(http.StatusBadRequest, err.Error())
+		return
+	}
+
+	err = u.svc.EditProfile(ctx, p)
+	if err != nil {
+		ctx.String(http.StatusBadRequest, "输入数据不对")
+		return
+	}
+	ctx.JSON(http.StatusOK, p)
 }
 
 func (u *UserHandler) Profile(ctx *gin.Context) {
@@ -143,5 +193,21 @@ func (u *UserHandler) Profile(ctx *gin.Context) {
 		ctx.JSON(http.StatusInternalServerError, "系统错误")
 		return
 	}
-	ctx.JSON(http.StatusOK, profile)
+	type response struct {
+		domain.Profile
+		Birthday string
+	}
+	toResponse := func(p domain.Profile) response {
+		return response{
+			Profile:  p,
+			Birthday: p.Birthday.Format("2006-01-02"),
+		}
+	}
+	ctx.JSON(http.StatusOK, toResponse(profile))
+}
+
+type profileRes struct {
+	Nickname string
+	Biology  string
+	Birthday time.Time
 }

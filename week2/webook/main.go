@@ -22,7 +22,7 @@ import (
 	"github.com/gevinzone/basic-go/week2/webook/internal/web/middleware"
 	"github.com/gin-contrib/cors"
 	"github.com/gin-contrib/sessions"
-	"github.com/gin-contrib/sessions/cookie"
+	"github.com/gin-contrib/sessions/memstore"
 	"github.com/gin-gonic/gin"
 	"gorm.io/driver/mysql"
 	"gorm.io/gorm"
@@ -63,7 +63,7 @@ func initWebServer() *gin.Engine {
 		MaxAge: 12 * time.Hour,
 	}))
 
-	server.Use(sessions.Sessions("gevin_session", cookie.NewStore([]byte("this is secret"))))
+	server.Use(sessions.Sessions("gevin_session", memstore.NewStore([]byte("this is secret"))))
 	server.Use(middleware.NewLoginMiddlewareBuilder().
 		IgnorePaths("/users/signup", "/users/login").
 		Build())

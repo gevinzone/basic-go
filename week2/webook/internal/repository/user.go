@@ -115,6 +115,7 @@ func (r *UserRepository) FindProfileByEmail(ctx context.Context, email string) (
 
 func (r *UserRepository) UpdateProfile(ctx context.Context, profile domain.Profile) error {
 	return r.profileDAO.Update(ctx, dao.Profile{
+		UserId:   profile.UserId,
 		Birthday: profile.Birthday.UnixMilli(),
 		Biology:  profile.Biology,
 		Nickname: profile.Nickname,
