@@ -22,3 +22,6 @@ go.work
 
 # Goland
 .idea/
+
+# MacOS
+.DS_Store

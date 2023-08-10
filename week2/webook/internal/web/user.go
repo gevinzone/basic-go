@@ -179,7 +179,18 @@ func (u *UserHandler) Edit(ctx *gin.Context) {
 		ctx.String(http.StatusBadRequest, "输入数据不对")
 		return
 	}
-	ctx.JSON(http.StatusOK, p)
+	type resp struct {
+		UserId   int64
+		NickName string
+		Biology  string
+		Birthday string
+	}
+	ctx.JSON(http.StatusOK, resp{
+		UserId:   p.UserId,
+		NickName: p.Nickname,
+		Biology:  p.Biology,
+		Birthday: p.Birthday.Format("2006-01-02"),
+	})
 }
 
 func (u *UserHandler) Profile(ctx *gin.Context) {
@@ -204,10 +215,4 @@ func (u *UserHandler) Profile(ctx *gin.Context) {
 		}
 	}
 	ctx.JSON(http.StatusOK, toResponse(profile))
-}
-
-type profileRes struct {
-	Nickname string
-	Biology  string
-	Birthday time.Time
 }
