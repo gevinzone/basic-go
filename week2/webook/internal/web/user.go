@@ -51,8 +51,8 @@ func (u *UserHandler) RegisterRoutes(server *gin.Engine) {
 	ug := server.Group("/users")
 	ug.GET("/profile", u.Profile)
 	ug.POST("/signup", u.SignUp)
-	//ug.POST("/login", u.Login)
-	ug.POST("/login", u.LoginJwt)
+	ug.POST("/login", u.Login)
+	//ug.POST("/login", u.LoginJwt)
 	ug.POST("/logout", u.Logout)
 	ug.POST("/edit", u.Edit)
 }
@@ -132,6 +132,7 @@ func (u *UserHandler) Login(ctx *gin.Context) {
 		MaxAge: 15,
 	})
 	sess.Set("userId", user.Id)
+	sess.Set("email", user.Email)
 	_ = sess.Save()
 	ctx.String(http.StatusOK, "登录成功")
 }
@@ -236,11 +237,19 @@ func (u *UserHandler) Edit(ctx *gin.Context) {
 }
 
 func (u *UserHandler) Profile(ctx *gin.Context) {
-	email := ctx.Query("email")
-	if email == "" {
-		ctx.JSON(http.StatusBadRequest, map[string]string{"error": "url 缺少email 参数"})
+	//email := ctx.Query("email")
+	//if email == "" {
+	//	ctx.JSON(http.StatusBadRequest, map[string]string{"error": "url 缺少email 参数"})
+	//	return
+	//}
+	sess := sessions.Default(ctx)
+	emailSess := sess.Get("email")
+	email, ok := emailSess.(string)
+	if !ok {
+		ctx.JSON(http.StatusBadRequest, map[string]string{"error": "系统错误"})
 		return
 	}
+
 	profile, err := u.svc.GetProfileByEmail(ctx, email)
 	if err != nil {
 		ctx.JSON(http.StatusInternalServerError, "系统错误")
