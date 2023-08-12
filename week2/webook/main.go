@@ -66,12 +66,12 @@ func initWebServer() *gin.Engine {
 	}))
 
 	server.Use(sessions.Sessions("gevin_session", memstore.NewStore([]byte("this is secret"))))
-	server.Use(middleware.NewLoginMiddlewareBuilder().
-		IgnorePaths("/users/signup", "/users/login").
-		Build())
-	//server.Use(middleware.NewLoginJwtMiddlewareBuilder().
+	//server.Use(middleware.NewLoginMiddlewareBuilder().
 	//	IgnorePaths("/users/signup", "/users/login").
 	//	Build())
+	server.Use(middleware.NewLoginJwtMiddlewareBuilder().
+		IgnorePaths("/users/signup", "/users/login").
+		Build())
 	return server
 }
 

@@ -16,7 +16,6 @@ package web
 
 import (
 	"errors"
-	"fmt"
 	regexp "github.com/dlclark/regexp2"
 	"github.com/gevinzone/basic-go/week2/webook/internal/domain"
 	"github.com/gevinzone/basic-go/week2/webook/internal/service"
@@ -49,10 +48,11 @@ func NewUserHandler(svc *service.UserService) *UserHandler {
 
 func (u *UserHandler) RegisterRoutes(server *gin.Engine) {
 	ug := server.Group("/users")
-	ug.GET("/profile", u.Profile)
+	//ug.GET("/profile", u.Profile)
+	ug.GET("/profile", u.ProfileJwt)
 	ug.POST("/signup", u.SignUp)
-	ug.POST("/login", u.Login)
-	//ug.POST("/login", u.LoginJwt)
+	//ug.POST("/login", u.Login)
+	ug.POST("/login", u.LoginJwt)
 	ug.POST("/logout", u.Logout)
 	ug.POST("/edit", u.Edit)
 }
@@ -157,14 +157,22 @@ func (u *UserHandler) LoginJwt(ctx *gin.Context) {
 		return
 	}
 
-	token := jwt.New(jwt.SigningMethodHS512)
+	claims := UserClaims{
+		RegisteredClaims: jwt.RegisteredClaims{
+			ExpiresAt: jwt.NewNumericDate(time.Now().Add(time.Minute)),
+		},
+		Uid:       user.Id,
+		Email:     user.Email,
+		UserAgent: ctx.Request.UserAgent(),
+	}
+
+	token := jwt.NewWithClaims(jwt.SigningMethodHS512, claims)
 	tokenStr, err := token.SignedString([]byte("95osj3fUD7fo0mlYdDbncXz4VD2igvf0"))
 	if err != nil {
 		ctx.String(http.StatusInternalServerError, "系统错误")
 		return
 	}
 	ctx.Header("x-jwt-token", tokenStr)
-	fmt.Println(user)
 	ctx.String(http.StatusOK, "登录成功")
 }
 
@@ -266,4 +274,38 @@ func (u *UserHandler) Profile(ctx *gin.Context) {
 		}
 	}
 	ctx.JSON(http.StatusOK, toResponse(profile))
+}
+
+func (u *UserHandler) ProfileJwt(ctx *gin.Context) {
+	c, _ := ctx.Get("claims")
+	claims, ok := c.(*UserClaims)
+
+	if !ok {
+		ctx.JSON(http.StatusBadRequest, map[string]string{"error": "系统错误"})
+		return
+	}
+
+	profile, err := u.svc.GetProfileByEmail(ctx, claims.Email)
+	if err != nil {
+		ctx.JSON(http.StatusInternalServerError, "系统错误")
+		return
+	}
+	type response struct {
+		domain.Profile
+		Birthday string
+	}
+	toResponse := func(p domain.Profile) response {
+		return response{
+			Profile:  p,
+			Birthday: p.Birthday.Format("2006-01-02"),
+		}
+	}
+	ctx.JSON(http.StatusOK, toResponse(profile))
+}
+
+type UserClaims struct {
+	jwt.RegisteredClaims
+	Uid       int64
+	Email     string
+	UserAgent string
 }
