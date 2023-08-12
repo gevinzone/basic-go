@@ -131,7 +131,12 @@ func (u *UserHandler) Login(ctx *gin.Context) {
 }
 
 func (u *UserHandler) Logout(ctx *gin.Context) {
-
+	sess := sessions.Default(ctx)
+	sess.Options(sessions.Options{
+		MaxAge: -1,
+	})
+	_ = sess.Save()
+	ctx.String(http.StatusOK, "成功登出")
 }
 
 func (u *UserHandler) Edit(ctx *gin.Context) {
