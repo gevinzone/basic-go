@@ -52,7 +52,9 @@ func initWebServer() *gin.Engine {
 	})
 	server.Use(cors.New(cors.Config{
 		//AllowOrigins: []string{"*"},
-		AllowHeaders:     []string{"Content-Type", "Authorization"},
+		AllowHeaders: []string{"Content-Type", "Authorization"},
+		// 你不加这个，前端是拿不到的
+		ExposeHeaders:    []string{"x-jwt-token"},
 		AllowCredentials: true,
 		AllowOriginFunc: func(origin string) bool {
 			if strings.HasPrefix(origin, "http://localhost") {
@@ -64,7 +66,10 @@ func initWebServer() *gin.Engine {
 	}))
 
 	server.Use(sessions.Sessions("gevin_session", memstore.NewStore([]byte("this is secret"))))
-	server.Use(middleware.NewLoginMiddlewareBuilder().
+	//server.Use(middleware.NewLoginMiddlewareBuilder().
+	//	IgnorePaths("/users/signup", "/users/login").
+	//	Build())
+	server.Use(middleware.NewLoginJwtMiddlewareBuilder().
 		IgnorePaths("/users/signup", "/users/login").
 		Build())
 	return server
