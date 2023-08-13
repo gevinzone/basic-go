@@ -90,7 +90,7 @@ func initUserHandler(db *gorm.DB) *web.UserHandler {
 }
 
 func initDB() *gorm.DB {
-	db, err := gorm.Open(mysql.Open("gevin:gevin@tcp(localhost:3306)/webook"))
+	db, err := gorm.Open(mysql.Open("root:root@tcp(localhost:3306)/webook"))
 	if err != nil {
 		panic(err)
 	}
