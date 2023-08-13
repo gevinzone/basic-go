@@ -20,10 +20,12 @@ import (
 	"github.com/gevinzone/basic-go/week2/webook/internal/service"
 	"github.com/gevinzone/basic-go/week2/webook/internal/web"
 	"github.com/gevinzone/basic-go/week2/webook/internal/web/middleware"
+	"github.com/gevinzone/basic-go/week2/webook/pkg/ginx/middlewares/ratelimit"
 	"github.com/gin-contrib/cors"
 	"github.com/gin-contrib/sessions"
 	"github.com/gin-contrib/sessions/memstore"
 	"github.com/gin-gonic/gin"
+	"github.com/redis/go-redis/v9"
 	"gorm.io/driver/mysql"
 	"gorm.io/gorm"
 	"strings"
@@ -50,6 +52,12 @@ func initWebServer() *gin.Engine {
 	server.Use(func(ctx *gin.Context) {
 		println("this is the second middleware")
 	})
+
+	redisClient := redis.NewClient(&redis.Options{
+		Addr: "localhost:6379",
+	})
+	server.Use(ratelimit.NewBuilder(redisClient, time.Second, 100).Build())
+
 	server.Use(cors.New(cors.Config{
 		//AllowOrigins: []string{"*"},
 		AllowHeaders: []string{"Content-Type", "Authorization"},
