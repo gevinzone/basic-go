@@ -28,19 +28,26 @@ import (
 	"github.com/redis/go-redis/v9"
 	"gorm.io/driver/mysql"
 	"gorm.io/gorm"
+	"net/http"
 	"strings"
 	"time"
 )
 
 func main() {
-	db := initDB()
-	server := initWebServer()
-	u := initUserHandler(db)
-	u.RegisterRoutes(server)
-	err := server.Run(":8000")
-	if err != nil {
-		panic(err)
-	}
+	//db := initDB()
+	//server := initWebServer()
+	//u := initUserHandler(db)
+	//u.RegisterRoutes(server)
+	//err := server.Run(":8000")
+	//if err != nil {
+	//	panic(err)
+	//}
+	server := gin.Default()
+	server.GET("/hello", func(ctx *gin.Context) {
+		ctx.String(http.StatusOK, "你好，你来了")
+	})
+
+	server.Run(":8080")
 }
 
 func initWebServer() *gin.Engine {
