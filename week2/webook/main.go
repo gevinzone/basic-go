@@ -15,6 +15,7 @@
 package main
 
 import (
+	"github.com/gevinzone/basic-go/week2/webook/config"
 	"github.com/gevinzone/basic-go/week2/webook/internal/repository"
 	"github.com/gevinzone/basic-go/week2/webook/internal/repository/dao"
 	"github.com/gevinzone/basic-go/week2/webook/internal/service"
@@ -34,15 +35,15 @@ import (
 )
 
 func main() {
-	//db := initDB()
-	//server := initWebServer()
-	//u := initUserHandler(db)
-	//u.RegisterRoutes(server)
-	//err := server.Run(":8000")
-	//if err != nil {
-	//	panic(err)
-	//}
-	server := gin.Default()
+	db := initDB()
+	server := initWebServer()
+	u := initUserHandler(db)
+	u.RegisterRoutes(server)
+	err := server.Run(":8000")
+	if err != nil {
+		panic(err)
+	}
+	//server := gin.Default()
 	server.GET("/hello", func(ctx *gin.Context) {
 		ctx.String(http.StatusOK, "你好，你来了")
 	})
@@ -61,7 +62,7 @@ func initWebServer() *gin.Engine {
 	})
 
 	redisClient := redis.NewClient(&redis.Options{
-		Addr: "localhost:6379",
+		Addr: config.Config.Redis.Addr,
 	})
 	server.Use(ratelimit.NewBuilder(redisClient, time.Second, 100).Build())
 
@@ -97,7 +98,7 @@ func initUserHandler(db *gorm.DB) *web.UserHandler {
 }
 
 func initDB() *gorm.DB {
-	db, err := gorm.Open(mysql.Open("root:root@tcp(localhost:3306)/webook"))
+	db, err := gorm.Open(mysql.Open(config.Config.DB.DSN))
 	if err != nil {
 		panic(err)
 	}
