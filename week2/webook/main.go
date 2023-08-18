@@ -39,10 +39,10 @@ func main() {
 	server := initWebServer()
 	u := initUserHandler(db)
 	u.RegisterRoutes(server)
-	err := server.Run(":8000")
-	if err != nil {
-		panic(err)
-	}
+	//err := server.Run(":8000")
+	//if err != nil {
+	//	panic(err)
+	//}
 	//server := gin.Default()
 	server.GET("/hello", func(ctx *gin.Context) {
 		ctx.String(http.StatusOK, "你好，你来了")
@@ -86,7 +86,7 @@ func initWebServer() *gin.Engine {
 	//	IgnorePaths("/users/signup", "/users/login").
 	//	Build())
 	server.Use(middleware.NewLoginJwtMiddlewareBuilder().
-		IgnorePaths("/users/signup", "/users/login").
+		IgnorePaths("/users/signup", "/users/login", "/hello").
 		Build())
 	return server
 }
