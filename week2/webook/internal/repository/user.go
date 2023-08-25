@@ -17,6 +17,7 @@ package repository
 import (
 	"context"
 	"github.com/gevinzone/basic-go/week2/webook/internal/domain"
+	"github.com/gevinzone/basic-go/week2/webook/internal/repository/cache"
 	"github.com/gevinzone/basic-go/week2/webook/internal/repository/dao"
 	"gorm.io/gorm"
 	"time"
@@ -31,6 +32,7 @@ type UserRepository struct {
 	db         *gorm.DB
 	userDAO    *dao.UserDAO
 	profileDAO *dao.ProfileDAO
+	cache      *cache.UserCache
 }
 
 func NewUserRepository(db *gorm.DB) *UserRepository {
@@ -74,11 +76,11 @@ func (r *UserRepository) Create(ctx context.Context, u domain.User) error {
 	})
 }
 
-func (r *UserRepository) FindById(int64) {
-	// 先从 cache 里面找
-	// 再从 dao 里面找
-	// 找到了回写 cache
-}
+//func (r *UserRepository) FindById(ctx context.Context, id int64) (domain.User, error) {
+//	// 先从 cache 里面找
+//	// 再从 dao 里面找
+//	// 找到了回写 cache
+//}
 
 func (r *UserRepository) FindProfileByEmail(ctx context.Context, email string) (domain.Profile, error) {
 	var (
