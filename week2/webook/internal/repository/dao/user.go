@@ -16,6 +16,7 @@ package dao
 
 import (
 	"context"
+	"database/sql"
 	"errors"
 	"github.com/go-sql-driver/mysql"
 	"gorm.io/gorm"
@@ -27,26 +28,46 @@ var (
 	ErrUserNotFound       = gorm.ErrRecordNotFound
 )
 
-type UserDAO struct {
+type UserDAO interface {
+	FindByEmail(ctx context.Context, email string) (User, error)
+	FindById(ctx context.Context, id int64) (User, error)
+	FindByPhone(ctx context.Context, phone string) (User, error)
+	Insert(ctx context.Context, u User) (User, error)
+}
+
+type GormUserDAO struct {
 	db *gorm.DB
 }
 
-func NewUserDAO(db *gorm.DB) *UserDAO {
-	return &UserDAO{db: db}
+func NewUserDAO(db *gorm.DB) *GormUserDAO {
+	return &GormUserDAO{db: db}
 }
 
-func (dao *UserDAO) FindByEmail(ctx context.Context, email string) (User, error) {
+func (dao *GormUserDAO) FindByEmail(ctx context.Context, email string) (User, error) {
 	var u User
 	err := dao.db.WithContext(ctx).Where("email=?", email).First(&u).Error
 	return u, err
 }
 
-func (dao *UserDAO) Insert(ctx context.Context, u User) (User, error) {
+func (dao *GormUserDAO) FindById(ctx context.Context, id int64) (User, error) {
+	var u User
+	err := dao.db.WithContext(ctx).Where("id=?", id).First(&u).Error
+	return u, err
+}
+
+func (dao *GormUserDAO) FindByPhone(ctx context.Context, phone string) (User, error) {
+	var u User
+	err := dao.db.WithContext(ctx).Where("phone=?", phone).First(&u).Error
+	return u, err
+}
+
+func (dao *GormUserDAO) Insert(ctx context.Context, u User) (User, error) {
 	now := time.Now().UnixMilli()
 	u.Ctime = now
 	u.Utime = now
 	err := dao.db.WithContext(ctx).Create(&u).Error
-	if mysqlErr, ok := err.(*mysql.MySQLError); ok {
+	var mysqlErr *mysql.MySQLError
+	if errors.As(err, &mysqlErr) {
 		const uniqueConflictsErrNo uint16 = 1062
 		if mysqlErr.Number == uniqueConflictsErrNo {
 			// 邮箱冲突
@@ -56,28 +77,34 @@ func (dao *UserDAO) Insert(ctx context.Context, u User) (User, error) {
 	return u, err
 }
 
-type ProfileDAO struct {
+type ProfileDAO interface {
+	FindByUserId(ctx context.Context, id int64) (Profile, error)
+	Insert(ctx context.Context, p Profile) error
+	Update(ctx context.Context, p Profile) error
+}
+
+type GORMProfileDAO struct {
 	db *gorm.DB
 }
 
-func NewProfileDAO(db *gorm.DB) *ProfileDAO {
-	return &ProfileDAO{db: db}
+func NewProfileDAO(db *gorm.DB) *GORMProfileDAO {
+	return &GORMProfileDAO{db: db}
 }
 
-func (dao *ProfileDAO) FindByUserId(ctx context.Context, id int64) (Profile, error) {
+func (dao *GORMProfileDAO) FindByUserId(ctx context.Context, id int64) (Profile, error) {
 	var p Profile
 	err := dao.db.WithContext(ctx).Where("user_id=?", id).First(&p).Error
 	return p, err
 }
 
-func (dao *ProfileDAO) Insert(ctx context.Context, p Profile) error {
+func (dao *GORMProfileDAO) Insert(ctx context.Context, p Profile) error {
 	now := time.Now().UnixMilli()
 	p.Ctime = now
 	p.Utime = now
 	return dao.db.WithContext(ctx).Create(&p).Error
 }
 
-func (dao *ProfileDAO) Update(ctx context.Context, p Profile) error {
+func (dao *GORMProfileDAO) Update(ctx context.Context, p Profile) error {
 	p.Utime = time.Now().UnixMilli()
 	return dao.db.WithContext(ctx).Model(&p).Where("user_id=?", p.UserId).Updates(p).Error
 }
@@ -85,8 +112,9 @@ func (dao *ProfileDAO) Update(ctx context.Context, p Profile) error {
 // User 直接对应数据库表结构
 // 有些人叫做 entity，有些人叫做 model，有些人叫做 PO(persistent object)
 type User struct {
-	Id       int64  `gorm:"primaryKey, autoIncrement"`
-	Email    string `gorm:"unique"`
+	Id       int64          `gorm:"primaryKey, autoIncrement"`
+	Email    sql.NullString `gorm:"unique"`
+	Phone    sql.NullString `gorm:"unique"`
 	Password string
 	Ctime    int64
 	Utime    int64

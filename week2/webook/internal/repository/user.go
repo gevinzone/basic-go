@@ -16,6 +16,7 @@ package repository
 
 import (
 	"context"
+	"database/sql"
 	"github.com/gevinzone/basic-go/week2/webook/internal/domain"
 	"github.com/gevinzone/basic-go/week2/webook/internal/repository/cache"
 	"github.com/gevinzone/basic-go/week2/webook/internal/repository/dao"
@@ -28,22 +29,29 @@ var (
 	ErrUserNotFound       = dao.ErrUserNotFound
 )
 
-type UserRepository struct {
+type UserRepository interface {
+	FindByEmail(ctx context.Context, email string) (domain.User, error)
+	FindByPhone(ctx context.Context, phone string) (domain.User, error)
+	Create(ctx context.Context, u domain.User) error
+	FindById(ctx context.Context, id int64) (domain.User, error)
+}
+
+type CachedUserRepository struct {
 	db         *gorm.DB
-	userDAO    *dao.UserDAO
-	profileDAO *dao.ProfileDAO
+	userDAO    *dao.GormUserDAO
+	profileDAO *dao.GORMProfileDAO
 	cache      *cache.UserCache
 }
 
-func NewUserRepository(db *gorm.DB) *UserRepository {
-	return &UserRepository{
+func NewUserRepository(db *gorm.DB) *CachedUserRepository {
+	return &CachedUserRepository{
 		db:         db,
 		userDAO:    dao.NewUserDAO(db),
 		profileDAO: dao.NewProfileDAO(db),
 	}
 }
 
-func (r *UserRepository) FindByEmail(ctx context.Context, email string) (domain.User, error) {
+func (r *CachedUserRepository) FindByEmail(ctx context.Context, email string) (domain.User, error) {
 	u, err := r.userDAO.FindByEmail(ctx, email)
 	if err != nil {
 		var user domain.User
@@ -51,22 +59,19 @@ func (r *UserRepository) FindByEmail(ctx context.Context, email string) (domain.
 	}
 	return domain.User{
 		Id:       u.Id,
-		Email:    u.Email,
+		Email:    u.Email.String,
 		Password: u.Password,
 	}, nil
 }
 
-func (r *UserRepository) Create(ctx context.Context, u domain.User) error {
+func (r *CachedUserRepository) Create(ctx context.Context, u domain.User) error {
 	return r.db.Transaction(func(tx *gorm.DB) error {
 		var (
 			user dao.User
 			err  error
 		)
 		userDAO := dao.NewUserDAO(tx)
-		if user, err = userDAO.Insert(ctx, dao.User{
-			Email:    u.Email,
-			Password: u.Password,
-		}); err != nil {
+		if user, err = userDAO.Insert(ctx, r.userDomainToEntity(u)); err != nil {
 			return err
 		}
 
@@ -76,13 +81,14 @@ func (r *UserRepository) Create(ctx context.Context, u domain.User) error {
 	})
 }
 
-//func (r *UserRepository) FindById(ctx context.Context, id int64) (domain.User, error) {
-//	// 先从 cache 里面找
-//	// 再从 dao 里面找
-//	// 找到了回写 cache
-//}
+func (r *CachedUserRepository) FindById(ctx context.Context, id int64) (domain.User, error) {
+	// 先从 cache 里面找
+	// 再从 dao 里面找
+	// 找到了回写 cache
+	panic("implement me")
+}
 
-func (r *UserRepository) FindProfileByEmail(ctx context.Context, email string) (domain.Profile, error) {
+func (r *CachedUserRepository) FindProfileByEmail(ctx context.Context, email string) (domain.Profile, error) {
 	var (
 		profile domain.Profile
 		err     error
@@ -103,7 +109,7 @@ func (r *UserRepository) FindProfileByEmail(ctx context.Context, email string) (
 		}
 		profile = domain.Profile{
 			UserId:   u.Id,
-			Email:    u.Email,
+			Email:    u.Email.String,
 			Nickname: p.Nickname,
 			Biology:  p.Biology,
 			Birthday: time.UnixMilli(p.Birthday),
@@ -115,11 +121,28 @@ func (r *UserRepository) FindProfileByEmail(ctx context.Context, email string) (
 	return profile, err
 }
 
-func (r *UserRepository) UpdateProfile(ctx context.Context, profile domain.Profile) error {
+func (r *CachedUserRepository) UpdateProfile(ctx context.Context, profile domain.Profile) error {
 	return r.profileDAO.Update(ctx, dao.Profile{
 		UserId:   profile.UserId,
 		Birthday: profile.Birthday.UnixMilli(),
 		Biology:  profile.Biology,
 		Nickname: profile.Nickname,
 	})
+}
+
+func (r *CachedUserRepository) userDomainToEntity(u domain.User) dao.User {
+	return dao.User{
+		Id: u.Id,
+		Email: sql.NullString{
+			String: u.Email,
+			// 我确实有手机号
+			Valid: u.Email != "",
+		},
+		Phone: sql.NullString{
+			String: u.Phone,
+			Valid:  u.Phone != "",
+		},
+		Password: u.Password,
+		Ctime:    u.Ctime.UnixMilli(),
+	}
 }

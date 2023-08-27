@@ -26,10 +26,10 @@ var ErrUserDuplicateEmail = repository.ErrUserDuplicateEmail
 var ErrInvalidUserOrPassword = errors.New("账号/邮箱或密码不对")
 
 type UserService struct {
-	repo *repository.UserRepository
+	repo *repository.CachedUserRepository
 }
 
-func NewUserService(repo *repository.UserRepository) *UserService {
+func NewUserService(repo *repository.CachedUserRepository) *UserService {
 	return &UserService{
 		repo: repo,
 	}
