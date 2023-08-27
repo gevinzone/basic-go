@@ -11,7 +11,7 @@ import (
 const codeTplId = "1877556"
 
 type CodeService struct {
-	repo   *repository.CodeRepository
+	repo   *repository.CachedCodeRepository
 	smsSvc sms.Service
 	//tplId string
 }

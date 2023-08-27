@@ -34,20 +34,23 @@ type UserRepository interface {
 	FindByPhone(ctx context.Context, phone string) (domain.User, error)
 	Create(ctx context.Context, u domain.User) error
 	FindById(ctx context.Context, id int64) (domain.User, error)
+	UpdateProfile(ctx context.Context, profile domain.Profile) error
+	FindProfileByEmail(ctx context.Context, email string) (domain.Profile, error)
 }
 
 type CachedUserRepository struct {
 	db         *gorm.DB
-	userDAO    *dao.GormUserDAO
-	profileDAO *dao.GORMProfileDAO
-	cache      *cache.UserCache
+	userDAO    dao.UserDAO
+	profileDAO dao.ProfileDAO
+	cache      cache.UserCache
 }
 
-func NewUserRepository(db *gorm.DB) *CachedUserRepository {
+func NewUserRepository(db *gorm.DB, userDao dao.UserDAO, profileDao dao.ProfileDAO, c cache.UserCache) UserRepository {
 	return &CachedUserRepository{
 		db:         db,
-		userDAO:    dao.NewUserDAO(db),
-		profileDAO: dao.NewProfileDAO(db),
+		userDAO:    userDao,
+		profileDAO: profileDao,
+		cache:      c,
 	}
 }
 
@@ -57,11 +60,16 @@ func (r *CachedUserRepository) FindByEmail(ctx context.Context, email string) (d
 		var user domain.User
 		return user, err
 	}
-	return domain.User{
-		Id:       u.Id,
-		Email:    u.Email.String,
-		Password: u.Password,
-	}, nil
+	return r.userEntityToDomain(u), nil
+}
+
+func (r *CachedUserRepository) FindByPhone(ctx context.Context, phone string) (domain.User, error) {
+	u, err := r.userDAO.FindByPhone(ctx, phone)
+	if err != nil {
+		var user domain.User
+		return user, err
+	}
+	return r.userEntityToDomain(u), nil
 }
 
 func (r *CachedUserRepository) Create(ctx context.Context, u domain.User) error {
@@ -82,10 +90,31 @@ func (r *CachedUserRepository) Create(ctx context.Context, u domain.User) error 
 }
 
 func (r *CachedUserRepository) FindById(ctx context.Context, id int64) (domain.User, error) {
-	// 先从 cache 里面找
-	// 再从 dao 里面找
-	// 找到了回写 cache
-	panic("implement me")
+	u, err := r.cache.Get(ctx, id)
+	if err == nil {
+		return u, nil
+	}
+	// 没这个数据
+	//if err == cache.ErrKeyNotExist {
+	// 去数据库里面加载
+	//}
+
+	ue, err := r.userDAO.FindById(ctx, id)
+	if err != nil {
+		return domain.User{}, err
+	}
+
+	u = r.userEntityToDomain(ue)
+
+	go func() {
+		err = r.cache.Set(ctx, u)
+		if err != nil {
+			// 我这里怎么办？
+			// 打日志，做监控
+			//return domain.User{}, err
+		}
+	}()
+	return u, err
 }
 
 func (r *CachedUserRepository) FindProfileByEmail(ctx context.Context, email string) (domain.Profile, error) {
@@ -144,5 +173,15 @@ func (r *CachedUserRepository) userDomainToEntity(u domain.User) dao.User {
 		},
 		Password: u.Password,
 		Ctime:    u.Ctime.UnixMilli(),
+	}
+}
+
+func (r *CachedUserRepository) userEntityToDomain(u dao.User) domain.User {
+	return domain.User{
+		Id:       u.Id,
+		Email:    u.Email.String,
+		Password: u.Password,
+		Phone:    u.Phone.String,
+		Ctime:    time.UnixMilli(u.Ctime),
 	}
 }

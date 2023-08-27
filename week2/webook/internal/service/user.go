@@ -25,17 +25,28 @@ import (
 var ErrUserDuplicateEmail = repository.ErrUserDuplicateEmail
 var ErrInvalidUserOrPassword = errors.New("账号/邮箱或密码不对")
 
-type UserService struct {
-	repo *repository.CachedUserRepository
+type UserService interface {
+	Login(ctx context.Context, email, password string) (domain.User, error)
+	SignUp(ctx context.Context, u domain.User) error
+	//FindOrCreate(ctx context.Context,
+	//	phone string) (domain.User, error)
+	//Profile(ctx context.Context,
+	//	id int64) (domain.User, error)
+	EditProfile(ctx context.Context, p domain.Profile) error
+	GetProfileByEmail(ctx context.Context, email string) (domain.Profile, error)
 }
 
-func NewUserService(repo *repository.CachedUserRepository) *UserService {
-	return &UserService{
+type DefaultUserService struct {
+	repo repository.UserRepository
+}
+
+func NewUserService(repo repository.UserRepository) UserService {
+	return &DefaultUserService{
 		repo: repo,
 	}
 }
 
-func (svc *UserService) Login(ctx context.Context, email, password string) (domain.User, error) {
+func (svc *DefaultUserService) Login(ctx context.Context, email, password string) (domain.User, error) {
 	u, err := svc.repo.FindByEmail(ctx, email)
 	var user domain.User
 	if errors.Is(err, repository.ErrUserNotFound) {
@@ -51,7 +62,7 @@ func (svc *UserService) Login(ctx context.Context, email, password string) (doma
 	return u, nil
 }
 
-func (svc *UserService) SignUp(ctx context.Context, u domain.User) error {
+func (svc *DefaultUserService) SignUp(ctx context.Context, u domain.User) error {
 	hash, err := bcrypt.GenerateFromPassword([]byte(u.Password), bcrypt.DefaultCost)
 	if err != nil {
 		return err
@@ -60,10 +71,10 @@ func (svc *UserService) SignUp(ctx context.Context, u domain.User) error {
 	return svc.repo.Create(ctx, u)
 }
 
-func (svc *UserService) EditProfile(ctx context.Context, p domain.Profile) error {
+func (svc *DefaultUserService) EditProfile(ctx context.Context, p domain.Profile) error {
 	return svc.repo.UpdateProfile(ctx, p)
 }
 
-func (svc *UserService) GetProfileByEmail(ctx context.Context, email string) (domain.Profile, error) {
+func (svc *DefaultUserService) GetProfileByEmail(ctx context.Context, email string) (domain.Profile, error) {
 	return svc.repo.FindProfileByEmail(ctx, email)
 }

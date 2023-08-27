@@ -17,6 +17,7 @@ package main
 import (
 	"github.com/gevinzone/basic-go/week2/webook/config"
 	"github.com/gevinzone/basic-go/week2/webook/internal/repository"
+	"github.com/gevinzone/basic-go/week2/webook/internal/repository/cache"
 	"github.com/gevinzone/basic-go/week2/webook/internal/repository/dao"
 	"github.com/gevinzone/basic-go/week2/webook/internal/service"
 	"github.com/gevinzone/basic-go/week2/webook/internal/web"
@@ -36,8 +37,9 @@ import (
 
 func main() {
 	db := initDB()
-	server := initWebServer()
-	u := initUserHandler(db)
+	redisClient := initRedis()
+	server := initWebServer(redisClient)
+	u := initUserHandler(db, redisClient)
 	u.RegisterRoutes(server)
 	//err := server.Run(":8000")
 	//if err != nil {
@@ -51,7 +53,7 @@ func main() {
 	server.Run(":8080")
 }
 
-func initWebServer() *gin.Engine {
+func initWebServer(redisClient redis.Cmdable) *gin.Engine {
 	server := gin.Default()
 
 	server.Use(func(ctx *gin.Context) {
@@ -61,9 +63,6 @@ func initWebServer() *gin.Engine {
 		println("this is the second middleware")
 	})
 
-	redisClient := redis.NewClient(&redis.Options{
-		Addr: config.Config.Redis.Addr,
-	})
 	server.Use(ratelimit.NewBuilder(redisClient, time.Second, 100).Build())
 
 	server.Use(cors.New(cors.Config{
@@ -91,10 +90,10 @@ func initWebServer() *gin.Engine {
 	return server
 }
 
-func initUserHandler(db *gorm.DB) *web.UserHandler {
+func initUserHandler(db *gorm.DB, client redis.Cmdable) *web.UserHandler {
 	return web.NewUserHandler(
 		service.NewUserService(
-			repository.NewUserRepository(db)))
+			repository.NewUserRepository(db, dao.NewUserDAO(db), dao.NewProfileDAO(db), cache.NewUserCache(client))))
 }
 
 func initDB() *gorm.DB {
@@ -108,4 +107,10 @@ func initDB() *gorm.DB {
 		panic(err)
 	}
 	return db
+}
+
+func initRedis() redis.Cmdable {
+	return redis.NewClient(&redis.Options{
+		Addr: config.Config.Redis.Addr,
+	})
 }
