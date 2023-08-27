@@ -3,12 +3,12 @@
 package main
 
 import (
-	"gitee.com/geekbang/basic-go/webook/internal/repository"
-	"gitee.com/geekbang/basic-go/webook/internal/repository/cache"
-	"gitee.com/geekbang/basic-go/webook/internal/repository/dao"
-	"gitee.com/geekbang/basic-go/webook/internal/service"
-	"gitee.com/geekbang/basic-go/webook/internal/web"
-	"gitee.com/geekbang/basic-go/webook/ioc"
+	"github.com/gevinzone/basic-go/week4/webook/internal/repository"
+	"github.com/gevinzone/basic-go/week4/webook/internal/repository/cache"
+	"github.com/gevinzone/basic-go/week4/webook/internal/repository/dao"
+	"github.com/gevinzone/basic-go/week4/webook/internal/service"
+	"github.com/gevinzone/basic-go/week4/webook/internal/web"
+	"github.com/gevinzone/basic-go/week4/webook/ioc"
 	"github.com/gin-gonic/gin"
 	"github.com/google/wire"
 )
