@@ -90,8 +90,3 @@ func (c *RedisCodeCache) Verify(ctx context.Context, biz, phone, inputCode strin
 func (c *RedisCodeCache) key(biz, phone string) string {
 	return fmt.Sprintf("phone_code:%s:%s", biz, phone)
 }
-
-// LocalCodeCache 假如说你要切换这个，你是不是得把 lua 脚本的逻辑，在这里再写一遍？
-type LocalCodeCache struct {
-	client redis.Cmdable
-}
