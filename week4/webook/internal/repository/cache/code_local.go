@@ -61,7 +61,7 @@ func (l *LocalCodeCache) Verify(ctx context.Context, biz, phone, inputCode strin
 	defer l.mutex.Unlock()
 	cntV, expiration, found := l.c.GetWithExpiration(cntKey)
 	if !found {
-		return false, ErrCodeVerifyTooManyTimes
+		return false, ErrUnknownForCode
 	}
 	cnt, ok := cntV.(int)
 	if !ok || cnt <= 0 {
