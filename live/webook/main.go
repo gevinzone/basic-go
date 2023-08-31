@@ -18,7 +18,7 @@ import (
 	"github.com/gevinzone/basic-go/live/webook/config"
 	"github.com/gevinzone/basic-go/live/webook/internal/repository"
 	"github.com/gevinzone/basic-go/live/webook/internal/repository/cache"
-	dao2 "github.com/gevinzone/basic-go/live/webook/internal/repository/dao"
+	"github.com/gevinzone/basic-go/live/webook/internal/repository/dao"
 	"github.com/gevinzone/basic-go/live/webook/internal/service"
 	"github.com/gevinzone/basic-go/live/webook/internal/web"
 	"github.com/gevinzone/basic-go/live/webook/internal/web/middleware"
@@ -91,9 +91,13 @@ func initWebServer(redisClient redis.Cmdable) *gin.Engine {
 }
 
 func initUserHandler(db *gorm.DB, client redis.Cmdable) *web.UserHandler {
+	userDao := dao.NewUserDAO(db)
+	profileDao := dao.NewProfileDAO(db)
+	userProfileDao := dao.NewUserWithProfileDAO(db, userDao, profileDao)
+	c := cache.NewUserCache(client)
 	return web.NewUserHandler(
 		service.NewUserService(
-			repository.NewUserRepository(db, dao2.NewUserDAO(db), dao2.NewProfileDAO(db), cache.NewUserCache(client))))
+			repository.NewUserRepository(userDao, profileDao, userProfileDao, c)))
 }
 
 func initDB() *gorm.DB {
@@ -102,7 +106,7 @@ func initDB() *gorm.DB {
 		panic(err)
 	}
 
-	err = dao2.InitTable(db)
+	err = dao.InitTable(db)
 	if err != nil {
 		panic(err)
 	}

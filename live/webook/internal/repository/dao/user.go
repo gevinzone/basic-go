@@ -109,6 +109,63 @@ func (dao *GORMProfileDAO) Update(ctx context.Context, p Profile) error {
 	return dao.db.WithContext(ctx).Model(&p).Where("user_id=?", p.UserId).Updates(p).Error
 }
 
+type UserWithProfileDAO interface {
+	Create(ctx context.Context, u User) error
+	FindProfileByEmail(ctx context.Context, email string) (User, Profile, error)
+}
+
+type GORMUserWithProfileDAO struct {
+	db         *gorm.DB
+	userDAO    UserDAO
+	profileDAO ProfileDAO
+}
+
+func NewUserWithProfileDAO(db *gorm.DB, userDAO UserDAO, profileDAO ProfileDAO) *GORMUserWithProfileDAO {
+	return &GORMUserWithProfileDAO{
+		db:         db,
+		userDAO:    userDAO,
+		profileDAO: profileDAO,
+	}
+}
+
+func (dao *GORMUserWithProfileDAO) Create(ctx context.Context, u User) error {
+	return dao.db.Transaction(func(tx *gorm.DB) error {
+		var (
+			user User
+			err  error
+		)
+		userDAO := NewUserDAO(tx)
+		if user, err = userDAO.Insert(ctx, u); err != nil {
+			return err
+		}
+
+		profileDAO := NewProfileDAO(tx)
+		err = profileDAO.Insert(ctx, Profile{UserId: user.Id, Birthday: time.Now().UnixMilli()})
+		return err
+	})
+}
+
+func (dao *GORMUserWithProfileDAO) FindProfileByEmail(ctx context.Context, email string) (User, Profile, error) {
+	var (
+		u   User
+		p   Profile
+		err error
+	)
+	er := dao.db.Transaction(func(tx *gorm.DB) error {
+		userDAO := NewUserDAO(tx)
+		profileDAO := NewProfileDAO(tx)
+		if u, err = userDAO.FindByEmail(ctx, email); err != nil {
+			return err
+		}
+		if p, err = profileDAO.FindByUserId(ctx, u.Id); err != nil {
+			return err
+		}
+
+		return nil
+	})
+	return u, p, er
+}
+
 // User 直接对应数据库表结构
 // 有些人叫做 entity，有些人叫做 model，有些人叫做 PO(persistent object)
 type User struct {

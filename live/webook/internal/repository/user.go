@@ -20,7 +20,6 @@ import (
 	"github.com/gevinzone/basic-go/live/webook/internal/domain"
 	"github.com/gevinzone/basic-go/live/webook/internal/repository/cache"
 	"github.com/gevinzone/basic-go/live/webook/internal/repository/dao"
-	"gorm.io/gorm"
 	"time"
 )
 
@@ -39,18 +38,18 @@ type UserRepository interface {
 }
 
 type CachedUserRepository struct {
-	db         *gorm.DB
-	userDAO    dao.UserDAO
-	profileDAO dao.ProfileDAO
-	cache      cache.UserCache
+	userDAO            dao.UserDAO
+	profileDAO         dao.ProfileDAO
+	userWithProfileDAO dao.UserWithProfileDAO
+	cache              cache.UserCache
 }
 
-func NewUserRepository(db *gorm.DB, userDao dao.UserDAO, profileDao dao.ProfileDAO, c cache.UserCache) UserRepository {
+func NewUserRepository(userDao dao.UserDAO, profileDao dao.ProfileDAO, userProfile dao.UserWithProfileDAO, c cache.UserCache) UserRepository {
 	return &CachedUserRepository{
-		db:         db,
-		userDAO:    userDao,
-		profileDAO: profileDao,
-		cache:      c,
+		userDAO:            userDao,
+		profileDAO:         profileDao,
+		userWithProfileDAO: userProfile,
+		cache:              c,
 	}
 }
 
@@ -73,20 +72,7 @@ func (r *CachedUserRepository) FindByPhone(ctx context.Context, phone string) (d
 }
 
 func (r *CachedUserRepository) Create(ctx context.Context, u domain.User) error {
-	return r.db.Transaction(func(tx *gorm.DB) error {
-		var (
-			user dao.User
-			err  error
-		)
-		userDAO := dao.NewUserDAO(tx)
-		if user, err = userDAO.Insert(ctx, r.userDomainToEntity(u)); err != nil {
-			return err
-		}
-
-		profileDAO := dao.NewProfileDAO(tx)
-		err = profileDAO.Insert(ctx, dao.Profile{UserId: user.Id, Birthday: time.Now().UnixMilli()})
-		return err
-	})
+	return r.userWithProfileDAO.Create(ctx, r.userDomainToEntity(u))
 }
 
 func (r *CachedUserRepository) FindById(ctx context.Context, id int64) (domain.User, error) {
@@ -120,22 +106,13 @@ func (r *CachedUserRepository) FindById(ctx context.Context, id int64) (domain.U
 func (r *CachedUserRepository) FindProfileByEmail(ctx context.Context, email string) (domain.Profile, error) {
 	var (
 		profile domain.Profile
+		u       dao.User
+		p       dao.Profile
 		err     error
 	)
-	err = r.db.Transaction(func(tx *gorm.DB) error {
-		var (
-			u  dao.User
-			p  dao.Profile
-			er error
-		)
-		userDAO := dao.NewUserDAO(tx)
-		profileDAO := dao.NewProfileDAO(tx)
-		if u, er = userDAO.FindByEmail(ctx, email); er != nil {
-			return er
-		}
-		if p, er = profileDAO.FindByUserId(ctx, u.Id); er != nil {
-			return er
-		}
+
+	u, p, err = r.userWithProfileDAO.FindProfileByEmail(ctx, email)
+	if err == nil {
 		profile = domain.Profile{
 			UserId:   u.Id,
 			Email:    u.Email.String,
@@ -145,8 +122,8 @@ func (r *CachedUserRepository) FindProfileByEmail(ctx context.Context, email str
 			Ctime:    time.UnixMilli(p.Ctime),
 			Utime:    time.UnixMilli(p.Utime),
 		}
-		return nil
-	})
+	}
+
 	return profile, err
 }
 
