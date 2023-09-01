@@ -12,25 +12,24 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package main
+package ioc
 
 import (
-	"github.com/gin-gonic/gin"
-	"net/http"
+	"github.com/gevinzone/basic-go/live/webook/config"
+	"github.com/gevinzone/basic-go/live/webook/internal/repository/dao"
+	"gorm.io/driver/mysql"
+	"gorm.io/gorm"
 )
 
-func main() {
-	//db := initDB()
-	//redisClient := initRedis()
-	//server := initWebServer(redisClient)
-	//u := initUserHandler(db, redisClient)
-	//u.RegisterRoutes(server)
-	//server := gin.Default()
+func InitDB() *gorm.DB {
+	db, err := gorm.Open(mysql.Open(config.Config.DB.DSN))
+	if err != nil {
+		panic(err)
+	}
 
-	server := InitWebServer()
-	server.GET("/hello", func(ctx *gin.Context) {
-		ctx.String(http.StatusOK, "你好，你来了")
-	})
-
-	server.Run(":8080")
+	err = dao.InitTable(db)
+	if err != nil {
+		panic(err)
+	}
+	return db
 }

@@ -39,7 +39,7 @@ type GormUserDAO struct {
 	db *gorm.DB
 }
 
-func NewUserDAO(db *gorm.DB) *GormUserDAO {
+func NewUserDAO(db *gorm.DB) UserDAO {
 	return &GormUserDAO{db: db}
 }
 
@@ -87,7 +87,7 @@ type GORMProfileDAO struct {
 	db *gorm.DB
 }
 
-func NewProfileDAO(db *gorm.DB) *GORMProfileDAO {
+func NewProfileDAO(db *gorm.DB) ProfileDAO {
 	return &GORMProfileDAO{db: db}
 }
 
@@ -120,7 +120,7 @@ type GORMUserWithProfileDAO struct {
 	profileDAO ProfileDAO
 }
 
-func NewUserWithProfileDAO(db *gorm.DB, userDAO UserDAO, profileDAO ProfileDAO) *GORMUserWithProfileDAO {
+func NewUserWithProfileDAO(db *gorm.DB, userDAO UserDAO, profileDAO ProfileDAO) UserWithProfileDAO {
 	return &GORMUserWithProfileDAO{
 		db:         db,
 		userDAO:    userDAO,
