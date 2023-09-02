@@ -10,6 +10,11 @@ import (
 
 const codeTplId = "1877556"
 
+var (
+	ErrCodeVerifyTooManyTimes = repository.ErrCodeVerifyTooManyTimes
+	ErrCodeSendTooMany        = repository.ErrCodeSendTooMany
+)
+
 type CodeService interface {
 	Send(ctx context.Context,
 		// 区别业务场景
@@ -62,5 +67,5 @@ func (svc *codeService) generateCode() string {
 	num := rand.Intn(1000000)
 	// 不够六位的，加上前导 0
 	// 000001
-	return fmt.Sprintf("%6d", num)
+	return fmt.Sprintf("%06d", num)
 }

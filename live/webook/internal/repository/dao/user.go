@@ -25,6 +25,7 @@ import (
 
 var (
 	ErrUserDuplicateEmail = errors.New("邮箱冲突")
+	ErrUserDuplicate      = errors.New("用户冲突")
 	ErrUserNotFound       = gorm.ErrRecordNotFound
 )
 

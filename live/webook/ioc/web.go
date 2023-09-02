@@ -60,6 +60,7 @@ func InitMiddlewares(redisClient redis.Cmdable) []gin.HandlerFunc {
 		sessions.Sessions("gevin_session", memstore.NewStore([]byte("this is secret"))),
 		middleware.NewLoginJwtMiddlewareBuilder().
 			IgnorePaths("/users/signup", "/users/login", "/hello").
+			IgnorePaths("/users/login_sms", "/users/login_sms/code/send").
 			Build(),
 	}
 }

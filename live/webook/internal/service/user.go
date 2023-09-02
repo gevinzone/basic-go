@@ -28,8 +28,7 @@ var ErrInvalidUserOrPassword = errors.New("账号/邮箱或密码不对")
 type UserService interface {
 	Login(ctx context.Context, email, password string) (domain.User, error)
 	SignUp(ctx context.Context, u domain.User) error
-	//FindOrCreate(ctx context.Context,
-	//	phone string) (domain.User, error)
+	FindOrCreate(ctx context.Context, phone string) (domain.User, error)
 	//Profile(ctx context.Context,
 	//	id int64) (domain.User, error)
 	EditProfile(ctx context.Context, p domain.Profile) error
@@ -77,4 +76,20 @@ func (svc *DefaultUserService) EditProfile(ctx context.Context, p domain.Profile
 
 func (svc *DefaultUserService) GetProfileByEmail(ctx context.Context, email string) (domain.Profile, error) {
 	return svc.repo.FindProfileByEmail(ctx, email)
+}
+
+func (svc *DefaultUserService) FindOrCreate(ctx context.Context, phone string) (domain.User, error) {
+	u, err := svc.repo.FindByPhone(ctx, phone)
+	if err != repository.ErrUserNotFound {
+		return u, err
+	}
+	u = domain.User{
+		Phone: phone,
+	}
+	err = svc.repo.Create(ctx, u)
+	if err != nil && !errors.Is(err, repository.ErrUserDuplicate) {
+		return u, err
+	}
+	// 因为这里会遇到主从延迟的问题
+	return svc.repo.FindByPhone(ctx, phone)
 }
