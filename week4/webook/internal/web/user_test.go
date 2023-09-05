@@ -206,3 +206,102 @@ func TestUserHandler_SignUp(t *testing.T) {
 		})
 	}
 }
+
+func TestUserHandler_LoginJWT(t *testing.T) {
+	testCases := []struct {
+		name     string
+		mock     func(ctrl *gomock.Controller) service.UserService
+		reqBody  string
+		wantCode int
+		wantBody string
+	}{
+		{
+			name: "登录成功",
+			mock: func(ctrl *gomock.Controller) service.UserService {
+				svc := svcmocks.NewMockUserService(ctrl)
+				svc.EXPECT().
+					Login(gomock.Any(), "abc123@email.com", "!ABC@123").
+					Return(domain.User{
+						Id:    1,
+						Email: "abc123@email.com",
+					}, nil)
+				return svc
+			},
+			reqBody: `
+{
+	"email": "abc123@email.com",
+	"password": "!ABC@123"
+}
+`,
+			wantCode: 200,
+			wantBody: "登录成功",
+		},
+		{
+			name: "json 解析不对",
+			mock: func(ctrl *gomock.Controller) service.UserService {
+				svc := svcmocks.NewMockUserService(ctrl)
+				return svc
+			},
+			reqBody: `
+{
+	"email": "abc123@email.com",
+	"password": 123
+}
+`,
+			wantCode: 400,
+		},
+		{
+			name: "用户名或密码不对",
+			mock: func(ctrl *gomock.Controller) service.UserService {
+				svc := svcmocks.NewMockUserService(ctrl)
+				svc.EXPECT().
+					Login(gomock.Any(), "abc123@email.com", "!ABC@123").
+					Return(domain.User{}, service.ErrInvalidUserOrPassword)
+				return svc
+			},
+			reqBody: `
+{
+	"email": "abc123@email.com",
+	"password": "!ABC@123"
+}
+`,
+			wantCode: 200,
+			wantBody: "用户名或密码不对",
+		},
+		{
+			name: "系统错误",
+			mock: func(ctrl *gomock.Controller) service.UserService {
+				svc := svcmocks.NewMockUserService(ctrl)
+				svc.EXPECT().
+					Login(gomock.Any(), "abc123@email.com", "!ABC@123").
+					Return(domain.User{}, errors.New("any error"))
+				return svc
+			},
+			reqBody: `
+{
+	"email": "abc123@email.com",
+	"password": "!ABC@123"
+}
+`,
+			wantCode: 200,
+			wantBody: "系统错误",
+		},
+	}
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			ctrl := gomock.NewController(t)
+			defer ctrl.Finish()
+			server := gin.Default()
+			userService := tc.mock(ctrl)
+			userHandler := NewUserHandler(userService, nil)
+			userHandler.RegisterRoutes(server)
+			req, err := http.NewRequest(http.MethodPost, "/users/login", bytes.NewBufferString(tc.reqBody))
+			require.NoError(t, err)
+			req.Header.Set("Content-Type", "application/json")
+			resp := httptest.NewRecorder()
+			server.ServeHTTP(resp, req)
+			assert.Equal(t, tc.wantCode, resp.Code)
+			assert.Equal(t, tc.wantBody, resp.Body.String())
+		})
+	}
+}
