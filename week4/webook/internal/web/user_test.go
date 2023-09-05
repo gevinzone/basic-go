@@ -2,6 +2,7 @@ package web
 
 import (
 	"bytes"
+	"encoding/json"
 	"errors"
 	"github.com/gevinzone/basic-go/week4/webook/internal/domain"
 	svcmocks "github.com/gevinzone/basic-go/week4/webook/internal/service/mocks"
@@ -302,6 +303,147 @@ func TestUserHandler_LoginJWT(t *testing.T) {
 			server.ServeHTTP(resp, req)
 			assert.Equal(t, tc.wantCode, resp.Code)
 			assert.Equal(t, tc.wantBody, resp.Body.String())
+		})
+	}
+}
+
+func TestUserHandler_LoginSMS(t *testing.T) {
+	testCases := []struct {
+		name     string
+		mock     func(ctrl *gomock.Controller) (service.UserService, service.CodeService)
+		reqBody  string
+		wantCode int
+		wantRes  Result
+	}{
+		{
+			name: "验证码校验通过",
+			mock: func(ctrl *gomock.Controller) (service.UserService, service.CodeService) {
+				userSvc := svcmocks.NewMockUserService(ctrl)
+				codeSvc := svcmocks.NewMockCodeService(ctrl)
+				codeSvc.EXPECT().Verify(gomock.Any(), biz, "18834506987", "567135").
+					Return(true, nil)
+				userSvc.EXPECT().FindOrCreate(gomock.Any(), "18834506987").
+					Return(domain.User{
+						Id: 1,
+					}, nil)
+				return userSvc, codeSvc
+			},
+			reqBody: `
+{
+	"phone": "18834506987",
+	"code": "567135"
+}
+`,
+			wantCode: 200,
+			wantRes: Result{
+				Msg: "验证码校验通过",
+			},
+		},
+		{
+			name: "json bind 错误",
+			mock: func(ctrl *gomock.Controller) (service.UserService, service.CodeService) {
+				userSvc := svcmocks.NewMockUserService(ctrl)
+				codeSvc := svcmocks.NewMockCodeService(ctrl)
+				return userSvc, codeSvc
+			},
+			reqBody: `
+{
+	"phone": "18834506987",
+	"code": 567135
+}
+`,
+			wantCode: 400,
+		},
+
+		{
+			name: "验证码校验系统错误",
+			mock: func(ctrl *gomock.Controller) (service.UserService, service.CodeService) {
+				userSvc := svcmocks.NewMockUserService(ctrl)
+				codeSvc := svcmocks.NewMockCodeService(ctrl)
+				codeSvc.EXPECT().Verify(gomock.Any(), biz, "18834506987", "567135").
+					Return(true, errors.New("any"))
+				return userSvc, codeSvc
+			},
+			reqBody: `
+{
+	"phone": "18834506987",
+	"code": "567135"
+}
+`,
+			wantCode: 200,
+			wantRes: Result{
+				Code: 5,
+				Msg:  "系统错误",
+			},
+		},
+
+		{
+			name: "验证码有误",
+			mock: func(ctrl *gomock.Controller) (service.UserService, service.CodeService) {
+				userSvc := svcmocks.NewMockUserService(ctrl)
+				codeSvc := svcmocks.NewMockCodeService(ctrl)
+				codeSvc.EXPECT().Verify(gomock.Any(), biz, "18834506987", "567135").
+					Return(false, nil)
+				return userSvc, codeSvc
+			},
+			reqBody: `
+{
+	"phone": "18834506987",
+	"code": "567135"
+}
+`,
+			wantCode: 200,
+			wantRes: Result{
+				Code: 4,
+				Msg:  "验证码有误",
+			},
+		},
+
+		{
+			name: "查询或创建用户有误",
+			mock: func(ctrl *gomock.Controller) (service.UserService, service.CodeService) {
+				userSvc := svcmocks.NewMockUserService(ctrl)
+				codeSvc := svcmocks.NewMockCodeService(ctrl)
+				codeSvc.EXPECT().Verify(gomock.Any(), biz, "18834506987", "567135").
+					Return(true, nil)
+				userSvc.EXPECT().FindOrCreate(gomock.Any(), "18834506987").
+					Return(domain.User{}, errors.New("any error"))
+				return userSvc, codeSvc
+			},
+			reqBody: `
+{
+	"phone": "18834506987",
+	"code": "567135"
+}
+`,
+			wantCode: 200,
+			wantRes: Result{
+				Code: 5,
+				Msg:  "系统错误",
+			},
+		},
+	}
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			ctrl := gomock.NewController(t)
+			defer ctrl.Finish()
+			userSvc, codeSvc := tc.mock(ctrl)
+			userHandler := NewUserHandler(userSvc, codeSvc)
+			server := gin.Default()
+			userHandler.RegisterRoutes(server)
+			req, err := http.NewRequest(http.MethodPost, "/users/login_sms", bytes.NewBufferString(tc.reqBody))
+			require.NoError(t, err)
+			req.Header.Set("Content-Type", "application/json")
+			resp := httptest.NewRecorder()
+			server.ServeHTTP(resp, req)
+			assert.Equal(t, tc.wantCode, resp.Code)
+			if len(resp.Body.Bytes()) == 0 {
+				return
+			}
+			var res Result
+			err = json.NewDecoder(resp.Body).Decode(&res)
+			require.NoError(t, err)
+			assert.Equal(t, tc.wantRes, res)
 		})
 	}
 }
