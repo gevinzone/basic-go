@@ -36,7 +36,7 @@ func (s *InorderService) Send(ctx context.Context, tpl string, args []string, nu
 	length := int64(len(s.svcs))
 	old := atomic.LoadInt64(&s.idx)
 	idx := atomic.AddInt64(&s.idx, 1)
-	for err := s.svcs[idx].Send(ctx, tpl, args, numbers...); ; {
+	for err := s.svcs[idx%length].Send(ctx, tpl, args, numbers...); ; {
 		if err == nil {
 			return nil
 		}
