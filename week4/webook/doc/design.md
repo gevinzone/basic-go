@@ -102,6 +102,7 @@ create table if not exists webook.sms
 3. 守护态的消费者协程，会一直存在
 4. 数据库设计时，numbers 用text字段进行存储
 5. 用乐观锁抢记录不太合适，乐观锁适用于并发不太激烈的场景，这里每个记录，都会让全部消费者去抢，如果消费者较多，性能浪费更多
+6. workshop 和 RateLimitFailOverService 的创建循环依赖，耦合实现
 
 # 改进方向
 

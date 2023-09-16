@@ -18,21 +18,30 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/gevinzone/basic-go/week4/webook/internal/domain"
+	"github.com/gevinzone/basic-go/week4/webook/internal/repository"
 	"github.com/gevinzone/basic-go/week4/webook/internal/service/sms"
 	"github.com/gevinzone/basic-go/week4/webook/internal/service/sms/failover"
 	"github.com/gevinzone/basic-go/week4/webook/pkg/ratelimit"
+	"time"
 )
 
 type RateLimitFailOverService struct {
-	svc     failover.FailureRateFailOverService
-	limiter ratelimit.Limiter
+	svc      failover.FailureRateFailOverService
+	limiter  ratelimit.Limiter
+	smsRepo  repository.SmsRepository
+	workshop Workshop
 }
 
-func NewRateLimitFailOverService(svc failover.FailureRateFailOverService, limiter ratelimit.Limiter) sms.Service {
-	return &RateLimitFailOverService{
+func NewRateLimitFailOverService(svc failover.FailureRateFailOverService, limiter ratelimit.Limiter, repo repository.SmsRepository, agentCnt int) sms.Service {
+	res := &RateLimitFailOverService{
 		svc:     svc,
 		limiter: limiter,
+		smsRepo: repo,
 	}
+	workshop := NewSimpleWorkShop(agentCnt, repo, res)
+	res.workshop = workshop
+	return res
 }
 
 func (r *RateLimitFailOverService) Send(ctx context.Context, tpl string, args []string, numbers ...string) error {
@@ -49,5 +58,20 @@ func (r *RateLimitFailOverService) Send(ctx context.Context, tpl string, args []
 }
 
 func (r *RateLimitFailOverService) asyncHandleSend(ctx context.Context, tpl string, args []string, numbers ...string) error {
-	panic("implement later")
+	if !r.workshop.IsStarted() {
+		r.workshop.Start(ctx)
+	}
+	now := time.Now()
+	bo := domain.Sms{
+		Id:         0,
+		Tpl:        tpl,
+		Args:       args,
+		Numbers:    numbers,
+		Processing: 0,
+		Retry:      0,
+		Ctime:      now,
+		Utime:      now,
+	}
+	_, err := r.smsRepo.SaveSms(ctx, bo)
+	return err
 }
