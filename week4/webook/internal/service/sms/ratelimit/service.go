@@ -21,7 +21,7 @@ import (
 	"github.com/gevinzone/basic-go/week4/webook/pkg/ratelimit"
 )
 
-var errLimited = fmt.Errorf("触发了限流")
+var ErrLimited = fmt.Errorf("触发了限流")
 
 type SmsService struct {
 	svc     sms.Service
@@ -38,7 +38,7 @@ func NewSmsService(svc sms.Service, limiter ratelimit.Limiter) sms.Service {
 func (s *SmsService) Send(ctx context.Context, tpl string, args []string, numbers ...string) error {
 	limited, err := s.limiter.Limit(ctx, "sms:tencent")
 	if err != nil || limited {
-		return errLimited
+		return ErrLimited
 	}
 	return s.svc.Send(ctx, tpl, args, numbers...)
 }
