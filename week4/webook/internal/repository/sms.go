@@ -24,6 +24,8 @@ import (
 
 const Delimiter = "&^"
 
+var ErrCompetitionFailed = dao.ErrCompetitionFailed
+
 type SmsRepository interface {
 	GetFirst(ctx context.Context) (domain.Sms, error)
 	SaveSms(ctx context.Context, sms domain.Sms) (domain.Sms, error)

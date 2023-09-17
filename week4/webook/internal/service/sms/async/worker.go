@@ -16,6 +16,8 @@ package async
 
 import (
 	"context"
+	"errors"
+	"github.com/ecodeclub/ekit/retry"
 	"github.com/gevinzone/basic-go/week4/webook/internal/repository"
 	"github.com/gevinzone/basic-go/week4/webook/internal/service/sms"
 	"github.com/opentracing/opentracing-go/log"
@@ -30,20 +32,23 @@ type Workshop interface {
 }
 
 type SimpleWorkShop struct {
-	started  bool
-	agents   []agent
-	agentCnt int
-	smsRepo  repository.SmsRepository
-	svc      sms.Service
+	started   bool
+	agents    []agent
+	agentCnt  int
+	smsRepo   repository.SmsRepository
+	svc       sms.Service
+	awaitTime time.Duration
 }
 
 var _ Workshop = (*SimpleWorkShop)(nil)
 
 func NewSimpleWorkShop(agentCnt int, repo repository.SmsRepository, svc sms.Service) Workshop {
 	res := &SimpleWorkShop{
-		started:  false,
-		agentCnt: agentCnt,
-		smsRepo:  repo,
+		started:   false,
+		agentCnt:  agentCnt,
+		smsRepo:   repo,
+		svc:       svc,
+		awaitTime: time.Minute * 5,
 	}
 
 	agents := make([]agent, 0, agentCnt)
@@ -83,13 +88,34 @@ func (w *SimpleWorkShop) createAgent() agent {
 }
 
 func (w *SimpleWorkShop) consume(ctx context.Context) error {
-	// todo:
-	// 1. 完成后，更新数据库状态
-	// 2. 退避重试
-	// 3. 超过重试次数后更新为死信状态
 	s, err := w.smsRepo.GetFirst(ctx)
+	if err == repository.ErrCompetitionFailed {
+		return nil
+	}
 	if err != nil {
 		return err
 	}
-	return w.svc.Send(ctx, s.Tpl, s.Args, s.Numbers...)
+	d := time.Now().Sub(s.Utime)
+	if d < w.awaitTime {
+		time.Sleep(w.awaitTime - d)
+	}
+	retryStrategy, err := retry.NewExponentialBackoffRetryStrategy(time.Second*30, time.Minute*20, 5)
+	if err != nil {
+		log.Error(err)
+		return err
+	}
+	interval, canRetry := time.Duration(0), true
+	for canRetry {
+		time.Sleep(interval)
+		err = w.svc.Send(ctx, s.Tpl, s.Args, s.Numbers...)
+		if err == nil {
+			// todo 把数据库更新为任务已处理
+			return nil
+		}
+
+		interval, canRetry = retryStrategy.Next()
+	}
+
+	// todo 把数据库状态更新为任务进入死信状态
+	return errors.New("未成功处理任务")
 }
