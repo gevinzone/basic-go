@@ -29,6 +29,8 @@ var ErrCompetitionFailed = errors.New("未抢到记录")
 type SmsDao interface {
 	GetFirst(ctx context.Context) (Sms, error)
 	SaveSms(ctx context.Context, sms domain.Sms) (Sms, error)
+	UpdateStatusAsProcessed(ctx context.Context, id int64) (int64, error)
+	UpdateStatusAsProcessFailed(ctx context.Context, id int64) (int64, error)
 }
 
 type SmsGormDao struct {
@@ -63,6 +65,22 @@ func (dao *SmsGormDao) SaveSms(ctx context.Context, sms domain.Sms) (Sms, error)
 	s := fromDomain(sms)
 	err := dao.db.WithContext(ctx).Create(&s).Error
 	return s, err
+}
+
+func (dao *SmsGormDao) UpdateStatusAsProcessed(ctx context.Context, id int64) (int64, error) {
+	res := dao.db.WithContext(ctx).Update("processing", domain.SmsProcessed).Where("`id`=? AND `processing`=?", id, domain.SmsProcessing)
+	if res.Error != nil {
+		return 0, res.Error
+	}
+	return res.RowsAffected, nil
+}
+
+func (dao *SmsGormDao) UpdateStatusAsProcessFailed(ctx context.Context, id int64) (int64, error) {
+	res := dao.db.WithContext(ctx).Update("processing", domain.SmsProcessFailed).Where("`id`=? AND `processing`=?", id, domain.SmsProcessing)
+	if res.Error != nil {
+		return 0, res.Error
+	}
+	return res.RowsAffected, nil
 }
 
 type Sms struct {

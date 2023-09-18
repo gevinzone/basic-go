@@ -29,6 +29,8 @@ var ErrCompetitionFailed = dao.ErrCompetitionFailed
 type SmsRepository interface {
 	GetFirst(ctx context.Context) (domain.Sms, error)
 	SaveSms(ctx context.Context, sms domain.Sms) (domain.Sms, error)
+	UpdateStatusAsProcessed(ctx context.Context, id int64) (int64, error)
+	UpdateStatusAsProcessFailed(ctx context.Context, id int64) (int64, error)
 }
 
 type SmsDbRepository struct {
@@ -57,6 +59,14 @@ func (s *SmsDbRepository) SaveSms(ctx context.Context, sms domain.Sms) (domain.S
 		return domain.Sms{}, err
 	}
 	return toDomain(entity), nil
+}
+
+func (s *SmsDbRepository) UpdateStatusAsProcessed(ctx context.Context, id int64) (int64, error) {
+	return s.smsDao.UpdateStatusAsProcessed(ctx, id)
+}
+
+func (s *SmsDbRepository) UpdateStatusAsProcessFailed(ctx context.Context, id int64) (int64, error) {
+	return s.smsDao.UpdateStatusAsProcessFailed(ctx, id)
 }
 
 func toDomain(entity dao.Sms) domain.Sms {

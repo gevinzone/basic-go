@@ -109,13 +109,19 @@ func (w *SimpleWorkShop) consume(ctx context.Context) error {
 		time.Sleep(interval)
 		err = w.svc.Send(ctx, s.Tpl, s.Args, s.Numbers...)
 		if err == nil {
-			// todo 把数据库更新为任务已处理
+			affect, er := w.smsRepo.UpdateStatusAsProcessed(ctx, s.Id)
+			if er != nil || affect != 1 {
+				log.Error(errors.New("更新数据库状态失败"))
+			}
 			return nil
 		}
 
 		interval, canRetry = retryStrategy.Next()
 	}
 
-	// todo 把数据库状态更新为任务进入死信状态
+	affect, er := w.smsRepo.UpdateStatusAsProcessFailed(ctx, s.Id)
+	if er != nil || affect != 1 {
+		log.Error(errors.New("更新数据库状态失败"))
+	}
 	return errors.New("未成功处理任务")
 }
