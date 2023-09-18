@@ -45,15 +45,12 @@ func (f *FailureRateFailOverService) Send(ctx context.Context, tpl string, args 
 
 ## 2. 如何既能触发限流判断，又能判断服务商崩溃
 
-依然用装饰器模式，里面供应商为RateLimitService，外面为FailOverService。
+依然用装饰器模式:
 
 ```go
 type FailureRateFailOverService struct {
-	svcs       []sms.RateLimitService
-	idx        int64
-	failureCnt int64
-	successCnt int64
-	rate       float64
+    svc      failover.FailureRateFailOverService
+    limiter  ratelimit.Limiter	
 }
 ```
 
@@ -93,6 +90,8 @@ create table if not exists webook.sms
 1. 设计如何判断服务商崩溃的算法实现，用了atomic，考虑了无锁并发安全，性能比较高，虽然有一定的并发隐患，但对本业务影响不大，且本业务本身的性质也决定了并发问题的危害较小，故这里用atomic而非锁是平衡折中后的结果，可以接受 
 2. 利用生产者消费者模式实现同步转异步，解耦错误处理的同时，实现了性能的可配
 3. 使用类似延迟队列的逻辑，进行错误处理
+4. 利用乐观锁抢数据，保证并发安全
+5. 提供了重试逻辑
 
 
 # 缺点
@@ -106,7 +105,7 @@ create table if not exists webook.sms
 
 # 改进方向
 
-1. 将守护态的消费者协程，改造为类似Java线程池的逻辑
+1. 将守护态的消费者协程，改造为类似Java线程池的逻辑，并发较小时关闭多余协程，仅保留核心协程
 2. 引入类似“死信队列”的逻辑，处理超过最大重试次数的记录
 3. 可以限制numbers的最大数量
 4. 使用分布式锁解决消费者的并发抢记录问题

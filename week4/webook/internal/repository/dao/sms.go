@@ -45,6 +45,7 @@ func NewSmsGormDao(db *gorm.DB) SmsDao {
 	}
 }
 
+// GetFirst 用乐观锁拿到记录，同时改掉记录的状态，保证只能被拿到一次
 func (dao *SmsGormDao) GetFirst(ctx context.Context) (Sms, error) {
 	var s Sms
 	err := dao.db.WithContext(ctx).Where("processing=?", domain.SmsUnprocessed).First(&s).Error
