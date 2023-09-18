@@ -67,7 +67,7 @@ func (r *RateLimitFailOverService) asyncHandleSend(ctx context.Context, tpl stri
 		Tpl:        tpl,
 		Args:       args,
 		Numbers:    numbers,
-		Processing: 0,
+		Processing: domain.SmsUnprocessed,
 		Retry:      0,
 		Ctime:      now,
 		Utime:      now,
