@@ -22,7 +22,7 @@ import (
 	"time"
 )
 
-const Delimiter = "&^"
+const Delimiter = dao.Delimiter
 
 var ErrCompetitionFailed = dao.ErrCompetitionFailed
 

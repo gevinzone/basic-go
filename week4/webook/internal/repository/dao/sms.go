@@ -18,11 +18,12 @@ import (
 	"context"
 	"errors"
 	"github.com/gevinzone/basic-go/week4/webook/internal/domain"
-	"github.com/gevinzone/basic-go/week4/webook/internal/repository"
 	"gorm.io/gorm"
 	"strings"
 	"time"
 )
+
+const Delimiter = "&^"
 
 var ErrCompetitionFailed = errors.New("未抢到记录")
 
@@ -69,7 +70,9 @@ func (dao *SmsGormDao) SaveSms(ctx context.Context, sms domain.Sms) (Sms, error)
 }
 
 func (dao *SmsGormDao) UpdateStatusAsProcessed(ctx context.Context, id int64) (int64, error) {
-	res := dao.db.WithContext(ctx).Update("processing", domain.SmsProcessed).Where("`id`=? AND `processing`=?", id, domain.SmsProcessing)
+	res := dao.db.WithContext(ctx).Model(&Sms{}).
+		Where("`id`=? AND `processing`=?", id, domain.SmsProcessing).
+		Update("processing", domain.SmsProcessed)
 	if res.Error != nil {
 		return 0, res.Error
 	}
@@ -77,7 +80,9 @@ func (dao *SmsGormDao) UpdateStatusAsProcessed(ctx context.Context, id int64) (i
 }
 
 func (dao *SmsGormDao) UpdateStatusAsProcessFailed(ctx context.Context, id int64) (int64, error) {
-	res := dao.db.WithContext(ctx).Update("processing", domain.SmsProcessFailed).Where("`id`=? AND `processing`=?", id, domain.SmsProcessing)
+	res := dao.db.WithContext(ctx).Model(&Sms{}).
+		Where("`id`=? AND `processing`=?", id, domain.SmsProcessing).
+		Update("processing", domain.SmsProcessFailed)
 	if res.Error != nil {
 		return 0, res.Error
 	}
@@ -99,8 +104,8 @@ func fromDomain(bo domain.Sms) Sms {
 	return Sms{
 		Id:         bo.Id,
 		Tpl:        bo.Tpl,
-		Args:       strings.Join(bo.Args, repository.Delimiter),
-		Numbers:    strings.Join(bo.Numbers, repository.Delimiter),
+		Args:       strings.Join(bo.Args, Delimiter),
+		Numbers:    strings.Join(bo.Numbers, Delimiter),
 		Processing: bo.Processing,
 		Retry:      bo.Retry,
 		Ctime:      bo.Ctime.UnixMilli(),
