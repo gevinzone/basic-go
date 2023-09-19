@@ -46,7 +46,7 @@ func (f *FailureRateFailOverService) Send(ctx context.Context, tpl string, args 
 	idx := atomic.LoadInt64(&f.idx)
 	failureCnt := atomic.LoadInt64(&f.failureCnt)
 	successCnt := atomic.LoadInt64(&f.successCnt)
-	if float64(failureCnt)/float64(failureCnt+successCnt) >= f.rate {
+	if failureCnt+successCnt > 0 && float64(failureCnt)/float64(failureCnt+successCnt) >= f.rate {
 		newIdx := (idx + 1) % int64(len(f.svcs))
 		if atomic.CompareAndSwapInt64(&f.idx, idx, newIdx) {
 			atomic.StoreInt64(&f.failureCnt, 0)
