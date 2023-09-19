@@ -102,6 +102,7 @@ func TestFailureRateFailOverService_Send_Normal(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			ctrl := gomock.NewController(t)
+			defer ctrl.Finish()
 			svc := tc.mock(ctrl)
 			err := svc.Send(tc.ctx, tc.tpl, tc.args, tc.numbers...)
 			assert.Equal(t, tc.wantErr, err)
@@ -250,6 +251,7 @@ func TestFailureRateFailOverService_Send_FailOver(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			ctrl := gomock.NewController(t)
+			defer ctrl.Finish()
 			svc := tc.mock(ctrl)
 			err := svc.Send(tc.ctx, tc.tpl, tc.args, tc.numbers...)
 			assert.Equal(t, tc.wantErr, err)
