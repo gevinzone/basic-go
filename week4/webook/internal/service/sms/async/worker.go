@@ -38,17 +38,21 @@ type SimpleWorkShop struct {
 	smsRepo   repository.SmsRepository
 	svc       sms.Service
 	awaitTime time.Duration
+	retry     retry.Strategy
 }
 
 var _ Workshop = (*SimpleWorkShop)(nil)
 
 func NewSimpleWorkShop(agentCnt int, repo repository.SmsRepository, svc sms.Service) Workshop {
+	// todo: option 模式
+	strategy, _ := retry.NewFixedIntervalRetryStrategy(time.Second*30, 5)
 	res := &SimpleWorkShop{
 		started:   false,
 		agentCnt:  agentCnt,
 		smsRepo:   repo,
 		svc:       svc,
 		awaitTime: time.Minute * 5,
+		retry:     strategy,
 	}
 
 	agents := make([]agent, 0, agentCnt)
@@ -99,11 +103,7 @@ func (w *SimpleWorkShop) consume(ctx context.Context) error {
 	if d < w.awaitTime {
 		time.Sleep(w.awaitTime - d)
 	}
-	retryStrategy, err := retry.NewExponentialBackoffRetryStrategy(time.Second*30, time.Minute*20, 5)
-	if err != nil {
-		log.Error(err)
-		return err
-	}
+
 	interval, canRetry := time.Duration(0), true
 	for canRetry {
 		time.Sleep(interval)
@@ -111,12 +111,12 @@ func (w *SimpleWorkShop) consume(ctx context.Context) error {
 		if err == nil {
 			affect, er := w.smsRepo.UpdateStatusAsProcessed(ctx, s.Id)
 			if er != nil || affect != 1 {
-				log.Error(errors.New("更新数据库状态失败"))
+				log.Error(errors.New("发生短信成功，但更新数据库状态失败"))
 			}
 			return nil
 		}
 
-		interval, canRetry = retryStrategy.Next()
+		interval, canRetry = w.retry.Next()
 	}
 
 	affect, er := w.smsRepo.UpdateStatusAsProcessFailed(ctx, s.Id)
