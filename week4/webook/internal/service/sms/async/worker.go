@@ -43,8 +43,9 @@ type SimpleWorkShop struct {
 
 var _ Workshop = (*SimpleWorkShop)(nil)
 
-func NewSimpleWorkShop(agentCnt int, repo repository.SmsRepository, svc sms.Service) Workshop {
-	// todo: option 模式
+type Option func(shop *SimpleWorkShop)
+
+func NewSimpleWorkShop(agentCnt int, repo repository.SmsRepository, svc sms.Service, opts ...Option) Workshop {
 	strategy, _ := retry.NewFixedIntervalRetryStrategy(time.Second*30, 5)
 	res := &SimpleWorkShop{
 		started:   false,
@@ -60,7 +61,16 @@ func NewSimpleWorkShop(agentCnt int, repo repository.SmsRepository, svc sms.Serv
 		agents = append(agents, res.createAgent())
 	}
 	res.agents = agents
+	for _, opt := range opts {
+		opt(res)
+	}
 	return res
+}
+
+func WithRetry(strategy retry.Strategy) Option {
+	return func(shop *SimpleWorkShop) {
+		shop.retry = strategy
+	}
 }
 
 func (w *SimpleWorkShop) IsStarted() bool {

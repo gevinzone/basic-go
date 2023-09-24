@@ -18,6 +18,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/ecodeclub/ekit/bean/option"
 	"github.com/gevinzone/basic-go/week4/webook/internal/domain"
 	"github.com/gevinzone/basic-go/week4/webook/internal/repository"
 	"github.com/gevinzone/basic-go/week4/webook/internal/service/sms"
@@ -33,15 +34,23 @@ type RateLimitFailOverService struct {
 	workshop Workshop
 }
 
-func NewRateLimitFailOverService(svc failover.FailureRateFailOverService, limiter ratelimit.Limiter, repo repository.SmsRepository, agentCnt int) sms.Service {
+func NewRateLimitFailOverService(svc failover.FailureRateFailOverService, limiter ratelimit.Limiter, repo repository.SmsRepository,
+	opts ...option.Option[RateLimitFailOverService]) sms.Service {
 	res := &RateLimitFailOverService{
 		svc:     svc,
 		limiter: limiter,
 		smsRepo: repo,
 	}
-	workshop := NewSimpleWorkShop(agentCnt, repo, res)
+	workshop := NewSimpleWorkShop(3, repo, res)
 	res.workshop = workshop
+	option.Apply(res, opts...)
 	return res
+}
+
+func WithWorkshop(shop Workshop) option.Option[RateLimitFailOverService] {
+	return func(t *RateLimitFailOverService) {
+		t.workshop = shop
+	}
 }
 
 func (r *RateLimitFailOverService) Send(ctx context.Context, tpl string, args []string, numbers ...string) error {
