@@ -1,4 +1,4 @@
-//gobuild e2e
+//go:build e2e
 
 // Copyright 2023 igevin
 //
