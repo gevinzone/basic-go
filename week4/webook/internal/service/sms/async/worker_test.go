@@ -17,11 +17,13 @@ package async
 import (
 	"context"
 	"errors"
+	retry "github.com/ecodeclub/ekit/retry"
 	"github.com/gevinzone/basic-go/week4/webook/internal/domain"
 	"github.com/gevinzone/basic-go/week4/webook/internal/repository"
 	repositorymock "github.com/gevinzone/basic-go/week4/webook/internal/repository/mock"
 	svcmocks "github.com/gevinzone/basic-go/week4/webook/internal/service/mocks"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"go.uber.org/mock/gomock"
 	"testing"
 	"time"
@@ -89,6 +91,45 @@ func TestSimpleWorkShop_Consume(t *testing.T) {
 			},
 			ctx:     context.Background(),
 			wantErr: nil,
+		},
+		{
+			name: "重试成功",
+			mock: func(ctrl *gomock.Controller) *SimpleWorkShop {
+				repo := repositorymock.NewMockSmsRepository(ctrl)
+				repo.EXPECT().GetFirst(gomock.Any()).Return(createSms(), nil)
+				repo.EXPECT().UpdateStatusAsProcessed(gomock.Any(), gomock.Any()).Return(int64(1), errors.New("not expected"))
+				svc := svcmocks.NewMockService(ctrl)
+				svc.EXPECT().Send(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(errors.New("send 失败"))
+				svc.EXPECT().Send(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(nil)
+				strategy, err := retry.NewFixedIntervalRetryStrategy(time.Second, 3)
+				require.NoError(t, err)
+				workshop := NewSimpleWorkShop(1, repo, svc, WithRetry(strategy))
+				s := workshop.(*SimpleWorkShop)
+				return s
+			},
+			ctx:     context.Background(),
+			wantErr: nil,
+		},
+		{
+			name: "重试失败",
+			mock: func(ctrl *gomock.Controller) *SimpleWorkShop {
+				repo := repositorymock.NewMockSmsRepository(ctrl)
+				repo.EXPECT().GetFirst(gomock.Any()).Return(createSms(), nil)
+				repo.EXPECT().UpdateStatusAsProcessFailed(gomock.Any(), gomock.Any()).Return(int64(1), nil)
+				svc := svcmocks.NewMockService(ctrl)
+				svc.EXPECT().Send(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(errors.New("send 失败"))
+				svc.EXPECT().Send(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(errors.New("send 失败"))
+				svc.EXPECT().Send(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(errors.New("send 失败"))
+				svc.EXPECT().Send(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(errors.New("send 失败"))
+
+				strategy, err := retry.NewFixedIntervalRetryStrategy(time.Second, 3)
+				require.NoError(t, err)
+				workshop := NewSimpleWorkShop(1, repo, svc, WithRetry(strategy))
+				s := workshop.(*SimpleWorkShop)
+				return s
+			},
+			ctx:     context.Background(),
+			wantErr: errors.New("未成功处理任务"),
 		},
 	}
 	for _, tc := range testCases {
