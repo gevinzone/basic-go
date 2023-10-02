@@ -1,16 +1,19 @@
 package web
 
 import (
+	"errors"
 	regexp "github.com/dlclark/regexp2"
 	"github.com/gevinzone/basic-go/week5/webook/internal/domain"
 	"github.com/gevinzone/basic-go/week5/webook/internal/service"
 	ijwt "github.com/gevinzone/basic-go/week5/webook/internal/web/jwt"
+	"github.com/gevinzone/basic-go/week5/webook/pkg/ginx"
 	"github.com/gin-contrib/sessions"
 	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/redis/go-redis/v9"
 	"go.uber.org/zap"
 	"net/http"
+	"time"
 )
 
 const biz = "login"
@@ -63,6 +66,7 @@ func (u *UserHandler) RegisterRoutes(server *gin.Engine) {
 	ug.POST("/login", u.LoginJWT)
 	ug.POST("/logout", u.LogoutJWT)
 	ug.POST("/edit", u.Edit)
+	ug.POST("/edit-v1", u.EditV1())
 	// PUT "/login/sms/code" 发验证码
 	// POST "/login/sms/code" 校验验证码
 	// POST /sms/login/code
@@ -366,6 +370,59 @@ func (u *UserHandler) Logout(ctx *gin.Context) {
 
 func (u *UserHandler) Edit(ctx *gin.Context) {
 
+}
+
+func (u *UserHandler) EditV1() gin.HandlerFunc {
+	type request struct {
+		Nickname string `json:"nickname"`
+		Biology  string `json:"biology"`
+		Birthday string `json:"birthday"`
+		Phone    string `json:"phone"`
+	}
+
+	reqConvert := func(r request) (domain.User, error) {
+		var p domain.User
+		if len([]rune(r.Nickname)) > 64 {
+			return p, errors.New("nickname 过长")
+		}
+		if len([]rune(r.Biology)) > 256 {
+			return p, errors.New("biology 过长")
+		}
+		t, er := time.Parse("2006-01-02", r.Birthday)
+		if er != nil {
+			return p, er
+		}
+		p = domain.User{
+			Nickname: r.Nickname,
+			Biology:  r.Biology,
+			Birthday: t,
+		}
+
+		return p, nil
+	}
+	fn := func(ctx *gin.Context, req request, uc *ijwt.UserClaims) (ginx.Result, error) {
+		p, err := reqConvert(req)
+		if err != nil {
+			return ginx.Result{
+				Code: 5,
+				Msg:  err.Error(),
+			}, err
+		}
+		// 随便找了个功能示意而已
+		err = u.svc.SignUp(ctx, p)
+		if err != nil {
+			return ginx.Result{
+				Code: 5,
+				Msg:  err.Error(),
+			}, err
+		}
+		return ginx.Result{
+			Code: 1,
+			Data: p,
+		}, nil
+	}
+
+	return ginx.HandleReq[request](fn)
 }
 
 func (u *UserHandler) ProfileJWT(ctx *gin.Context) {
