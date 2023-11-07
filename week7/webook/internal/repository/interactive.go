@@ -2,10 +2,13 @@ package repository
 
 import (
 	"context"
+	"errors"
 	"github.com/gevinzone/basic-go/week7/webook/internal/domain"
 	"github.com/gevinzone/basic-go/week7/webook/internal/repository/cache"
 	"github.com/gevinzone/basic-go/week7/webook/internal/repository/dao"
 	"github.com/gevinzone/basic-go/week7/webook/pkg/logger"
+	"github.com/redis/go-redis/v9"
+	"sync"
 )
 
 //go:generate mockgen -source=./interactive.go -package=repomocks -destination=mocks/interactive.mock.go InteractiveRepository
@@ -21,12 +24,15 @@ type InteractiveRepository interface {
 	Liked(ctx context.Context, biz string, id int64, uid int64) (bool, error)
 	Collected(ctx context.Context, biz string, id int64, uid int64) (bool, error)
 	AddRecord(ctx context.Context, aid int64, uid int64) error
+	GetNLiked(ctx context.Context, biz string, n int64) ([]domain.Interactive, error)
 }
 
 type CachedReadCntRepository struct {
 	cache cache.InteractiveCache
 	dao   dao.InteractiveDAO
 	l     logger.LoggerV1
+	// mutex 处于简化代码，用本地锁代替，实际开发中，这里应该用redis的分布式锁
+	mutex sync.Mutex
 }
 
 func (c *CachedReadCntRepository) AddRecord(ctx context.Context, aid int64, uid int64) error {
@@ -197,6 +203,69 @@ func (c *CachedReadCntRepository) GetCollection() (domain.Collection, error) {
 	return domain.Collection{
 		Name: items[0].Cname,
 	}, nil
+}
+
+func (c *CachedReadCntRepository) GetNLiked(ctx context.Context, biz string, n int64) ([]domain.Interactive, error) {
+	ids, err := c.cache.GetNArticleLiked(ctx, biz, n)
+	if errors.Is(err, redis.Nil) {
+		c.mutex.Lock()
+		ids, err = c.cache.GetNArticleLiked(ctx, biz, n)
+		if errors.Is(err, redis.Nil) {
+			err = c.traversArticlesForLiked(ctx, biz)
+			if err != nil {
+				return nil, err
+			}
+			ids, err = c.cache.GetNArticleLiked(ctx, biz, n)
+		}
+		c.mutex.Unlock()
+	}
+	if err != nil {
+		return nil, err
+	}
+	res := make([]domain.Interactive, 0, len(ids))
+	for _, id := range ids {
+		val, er := c.Get(ctx, biz, id)
+		if er != nil {
+			return nil, er
+		}
+		res = append(res, val)
+	}
+	return res, nil
+}
+
+func (c *CachedReadCntRepository) traversArticlesForLiked(ctx context.Context, biz string) error {
+	last, limit := int64(0), 1000
+	for {
+		activities, err := c.traversArticleRangeForLiked(ctx, biz, last, limit)
+		if err != nil {
+			c.l.Error("获取Interactive数据异常", logger.Error(err))
+			return err
+		}
+
+		err = c.cache.AddToArticleLiked(ctx, biz, activities)
+		if err != nil {
+			return err
+		}
+		size := len(activities)
+
+		if len(activities) < 1 {
+			break
+		}
+		last = activities[size-1].Id
+	}
+	return nil
+}
+
+func (c *CachedReadCntRepository) traversArticleRangeForLiked(ctx context.Context, biz string, lastId int64, limit int) ([]domain.Interactive, error) {
+	res, err := c.dao.GetRange(ctx, biz, lastId, limit)
+	if err != nil {
+		return nil, err
+	}
+	activities := make([]domain.Interactive, 0, len(res))
+	for _, r := range res {
+		activities = append(activities, r.ToDomain())
+	}
+	return activities, nil
 }
 
 func NewCachedInteractiveRepository(dao dao.InteractiveDAO,

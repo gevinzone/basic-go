@@ -2,6 +2,7 @@ package dao
 
 import (
 	"context"
+	"github.com/gevinzone/basic-go/week7/webook/internal/domain"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
 	"time"
@@ -19,6 +20,7 @@ type InteractiveDAO interface {
 	InsertCollectionBiz(ctx context.Context, cb UserCollectionBiz) error
 	GetCollectionInfo(ctx context.Context, biz string, bizId, uid int64) (UserCollectionBiz, error)
 	BatchIncrReadCnt(ctx context.Context, bizs []string, ids []int64) error
+	GetRange(ctx context.Context, biz string, last int64, limit int) ([]Interactive, error)
 }
 
 type GORMInteractiveDAO struct {
@@ -199,6 +201,13 @@ func (dao *GORMInteractiveDAO) DeleteLikeInfo(ctx context.Context, biz string, b
 	})
 }
 
+func (dao *GORMInteractiveDAO) GetRange(ctx context.Context, biz string, last int64, limit int) ([]Interactive, error) {
+	var activities []Interactive
+	err := dao.db.WithContext(ctx).
+		Where("biz=? AND id>?", biz, last).Limit(limit).Find(&activities).Error
+	return activities, err
+}
+
 func NewGORMInteractiveDAO(db *gorm.DB) InteractiveDAO {
 	return &GORMInteractiveDAO{
 		db: db,
@@ -303,6 +312,17 @@ type InteractiveV1 struct {
 	CntType string
 	Ctime   int64
 	Utime   int64
+}
+
+func (i *Interactive) ToDomain() domain.Interactive {
+	return domain.Interactive{
+		Id:         i.Id,
+		Biz:        i.Biz,
+		BizId:      i.BizId,
+		ReadCnt:    i.ReadCnt,
+		LikeCnt:    i.LikeCnt,
+		CollectCnt: i.CollectCnt,
+	}
 }
 
 // UserLikeBiz 命名无能，用户点赞的某个东西

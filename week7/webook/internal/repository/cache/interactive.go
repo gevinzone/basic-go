@@ -19,6 +19,7 @@ const (
 	fieldReadCnt    = "read_cnt"
 	fieldCollectCnt = "collect_cnt"
 	fieldLikeCnt    = "like_cnt"
+	articleBizId    = -1
 )
 
 //go:generate mockgen -source=./interactive.go -package=cachemocks -destination=mocks/interactive.mock.go InteractiveCache
@@ -36,6 +37,8 @@ type InteractiveCache interface {
 	// 事实上，这里 liked 和 collected 是不需要缓存的
 	Get(ctx context.Context, biz string, bizId int64) (domain.Interactive, error)
 	Set(ctx context.Context, biz string, bizId int64, intr domain.Interactive) error
+	GetNArticleLiked(ctx context.Context, biz string, n int64) ([]int64, error)
+	AddToArticleLiked(ctx context.Context, biz string, activities []domain.Interactive) error
 }
 
 // 方案1
@@ -146,9 +149,40 @@ func (r *RedisInteractiveCache) Set(ctx context.Context, biz string, bizId int64
 	return r.client.Expire(ctx, key, time.Minute*15).Err()
 }
 
+func (r *RedisInteractiveCache) GetNArticleLiked(ctx context.Context, biz string, n int64) ([]int64, error) {
+	k := r.key(biz, articleBizId)
+	res, err := r.client.ZRange(ctx, k, 0, n-1).Result()
+	if err != nil {
+		return nil, err
+	}
+	ids := make([]int64, len(res))
+	for i := 0; i < len(res); i++ {
+		if ids[i], err = strconv.ParseInt(res[i], 10, 64); err != nil {
+			return nil, err
+		}
+	}
+	return ids, err
+}
+
+func (r *RedisInteractiveCache) AddToArticleLiked(ctx context.Context, biz string, activities []domain.Interactive) error {
+	key := r.key(biz, articleBizId)
+	zs := make([]redis.Z, 0, len(activities))
+	for _, activity := range activities {
+		zs = append(zs, redis.Z{
+			Score:  float64(activity.LikeCnt),
+			Member: activity.BizId,
+		})
+	}
+	return r.client.ZAdd(ctx, key, zs...).Err()
+}
+
 func (r *RedisInteractiveCache) key(biz string, bizId int64) string {
 	return fmt.Sprintf("interactive:%s:%d", biz, bizId)
 }
+
+//func (r *RedisInteractiveCache) keyCollective(biz string) string {
+//	return fmt.Sprintf("interactive:%s", biz)
+//}
 
 //func (r *RedisInteractiveCache) keyPersonal(biz string, bizId int64) string {
 //	return fmt.Sprintf("interactive:personal:%s:%d:%d", biz, bizId, uid)

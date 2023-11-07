@@ -18,6 +18,7 @@ type InteractiveService interface {
 	// cid 不一定有，或者说 0 对应的是该用户的默认收藏夹
 	Collect(ctx context.Context, biz string, bizId, cid, uid int64) error
 	Get(ctx context.Context, biz string, bizId, uid int64) (domain.Interactive, error)
+	GetNLiked(ctx context.Context, biz string, n int64) ([]domain.Interactive, error)
 }
 
 type interactiveService struct {
@@ -77,6 +78,10 @@ func (i *interactiveService) Collect(ctx context.Context,
 	// service 还叫做收藏
 	// repository
 	return i.repo.AddCollectionItem(ctx, biz, bizId, cid, uid)
+}
+
+func (i *interactiveService) GetNLiked(ctx context.Context, biz string, n int64) ([]domain.Interactive, error) {
+	return i.repo.GetNLiked(ctx, biz, n)
 }
 
 func NewInteractiveService(repo repository.InteractiveRepository,

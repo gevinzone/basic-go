@@ -2,8 +2,9 @@ package domain
 
 // Interactive 这个是总体交互的计数
 type Interactive struct {
-	//Biz   string
-	//BizId int64
+	Id    int64
+	Biz   string
+	BizId int64
 
 	ReadCnt    int64 `json:"read_cnt"`
 	LikeCnt    int64 `json:"like_cnt"`
