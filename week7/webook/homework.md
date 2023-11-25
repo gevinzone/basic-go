@@ -65,3 +65,5 @@
 # 作业详情
 
 作业按基础方案来实现，使用了方案2的优化手段
+
+在repository, cache, dao和service中均补充了getNLike 相关的实现，单个文章的喜欢功能还没修改
