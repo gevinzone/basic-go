@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"github.com/IBM/sarama"
 	"github.com/gevinzone/basic-go/week9/webook/pkg/logger"
+	"github.com/prometheus/client_golang/prometheus"
 	"time"
 )
 
@@ -14,10 +15,22 @@ type BatchHandler[T any] struct {
 	// 用 option 模式来设置这个 batchSize 和 duration
 	batchSize     int
 	batchDuration time.Duration
+	counter       prometheus.Counter
 }
 
 func NewBatchHandler[T any](l logger.LoggerV1, fn func(msgs []*sarama.ConsumerMessage, ts []T) error) *BatchHandler[T] {
-	return &BatchHandler[T]{l: l, fn: fn, batchDuration: time.Second, batchSize: 10}
+	return &BatchHandler[T]{
+		l:             l,
+		fn:            fn,
+		batchDuration: time.Second,
+		batchSize:     10,
+		counter: (&CounterBuilder{
+			Namespace:  "geekbang-gevin",
+			Subsystem:  "webook",
+			Name:       "sarama_consume_msg",
+			Help:       "统计批量消费错误次数",
+			InstanceID: "my-instance-1",
+		}).Build()}
 }
 
 func (b *BatchHandler[T]) Setup(session sarama.ConsumerGroupSession) error {
@@ -68,6 +81,7 @@ func (b *BatchHandler[T]) ConsumeClaim(session sarama.ConsumerGroupSession, clai
 		if err != nil {
 			b.l.Error("调用业务批量接口失败",
 				logger.Error(err))
+			b.counter.Inc()
 			// 你这里整个批次都要记下来
 
 			// 还要继续往前消费

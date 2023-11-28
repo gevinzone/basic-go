@@ -4,19 +4,28 @@ import (
 	"encoding/json"
 	"github.com/IBM/sarama"
 	"github.com/gevinzone/basic-go/week9/webook/pkg/logger"
+	"github.com/prometheus/client_golang/prometheus"
 )
 
 type HandlerV1[T any] func(msg *sarama.ConsumerMessage, t T) error
 
 type Handler[T any] struct {
-	l  logger.LoggerV1
-	fn func(msg *sarama.ConsumerMessage, t T) error
+	l       logger.LoggerV1
+	fn      func(msg *sarama.ConsumerMessage, t T) error
+	counter prometheus.Counter
 }
 
 func NewHandler[T any](l logger.LoggerV1, fn func(msg *sarama.ConsumerMessage, t T) error) *Handler[T] {
 	return &Handler[T]{
 		l:  l,
 		fn: fn,
+		counter: (&CounterBuilder{
+			Namespace:  "geekbang-gevin",
+			Subsystem:  "webook",
+			Name:       "sarama_consume_msg",
+			Help:       "统计消费错误次数",
+			InstanceID: "my-instance-1",
+		}).Build(),
 	}
 }
 
@@ -60,9 +69,32 @@ func (h Handler[T]) ConsumeClaim(session sarama.ConsumerGroupSession, claim sara
 				logger.String("topic", msg.Topic),
 				logger.Int64("partition", int64(msg.Partition)),
 				logger.Int64("offset", msg.Offset))
+			h.counter.Inc()
 		} else {
 			session.MarkMessage(msg, "")
 		}
 	}
 	return nil
+}
+
+type CounterBuilder struct {
+	Namespace  string
+	Subsystem  string
+	Name       string
+	Help       string
+	InstanceID string
+}
+
+func (c *CounterBuilder) Build() prometheus.Counter {
+	counter := prometheus.NewCounter(prometheus.CounterOpts{
+		Namespace: c.Namespace,
+		Subsystem: c.Subsystem,
+		Name:      c.Name + "_active_req",
+		Help:      c.Help,
+		ConstLabels: map[string]string{
+			"instance_id": c.InstanceID,
+		},
+	})
+	prometheus.MustRegister(counter)
+	return counter
 }
