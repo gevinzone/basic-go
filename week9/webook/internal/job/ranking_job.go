@@ -54,6 +54,14 @@ func (r *RankingJob) Run() error {
 			// 这边没拿到锁，极大概率是别人持有了锁
 			return nil
 		}
+		load := getServerLoad("webook-server1")
+		if load >= shreshHold {
+			if err = lock.Unlock(ctx); err != nil {
+				r.l.Error("释放锁失败", logger.Error(err))
+			}
+			return nil
+
+		}
 		r.lock = lock
 		// 我怎么保证我这里，一直拿着这个锁？？？
 		go func() {
