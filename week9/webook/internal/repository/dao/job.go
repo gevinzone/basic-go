@@ -7,7 +7,7 @@ import (
 )
 
 type JobDAO interface {
-	Preempt(ctx context.Context) (Job, error)
+	Preempt(ctx context.Context, refreshInterval time.Duration) (Job, error)
 	Release(ctx context.Context, id int64) error
 	UpdateUtime(ctx context.Context, id int64) error
 	UpdateNextTime(ctx context.Context, id int64, next time.Time) error
@@ -51,7 +51,7 @@ func (g *GORMJobDAO) Release(ctx context.Context, id int64) error {
 		}).Error
 }
 
-func (g *GORMJobDAO) Preempt(ctx context.Context) (Job, error) {
+func (g *GORMJobDAO) Preempt(ctx context.Context, refreshInterval time.Duration) (Job, error) {
 	// 高并发情况下，大部分都是陪太子读书
 	// 100 个 goroutine
 	// 要转几次？ 所有 goroutine 执行的循环次数加在一起是
@@ -71,7 +71,11 @@ func (g *GORMJobDAO) Preempt(ctx context.Context) (Job, error) {
 		// 找到之后你要干嘛？你要抢占
 		if err != nil {
 			// // 没有任务。从这里返回
-			return Job{}, err
+			err = db.WithContext(ctx).Where("status = ? AND utime < ?", jobStatusRunning, now.Add(-refreshInterval).UnixMilli()).
+				First(&j).Error
+			if err != nil {
+				return Job{}, err
+			}
 		}
 		// 两个 goroutine 都拿到 id =1 的数据
 		// 能不能用 utime?

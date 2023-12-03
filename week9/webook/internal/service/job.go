@@ -25,7 +25,7 @@ type cronJobService struct {
 }
 
 func (p *cronJobService) Preempt(ctx context.Context) (domain.Job, error) {
-	j, err := p.repo.Preempt(ctx)
+	j, err := p.repo.Preempt(ctx, p.refreshInterval)
 
 	// 你的续约呢？
 	//ch := make(chan struct{})
